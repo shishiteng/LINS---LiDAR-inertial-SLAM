@@ -17,54 +17,41 @@
 
 #include <Estimator.h>
 
-namespace fusion {
+namespace fusion
+{
 
 int Scan::scan_counter_ = 0;
 
-LinsFusion::LinsFusion(ros::NodeHandle& nh, ros::NodeHandle& pnh)
+LinsFusion::LinsFusion(ros::NodeHandle &nh, ros::NodeHandle &pnh)
     : nh_(nh), pnh_(pnh) {}
 
 LinsFusion::~LinsFusion() { delete estimator; }
 
 void LinsFusion::run() { initialization(); }
 
-void LinsFusion::initialization() {
+void LinsFusion::initialization()
+{
   // Implement an iterative-ESKF Kalman filter class
   estimator = new StateEstimator();
 
   // Subscribe to IMU, segmented point clouds, and map-refined odometry feedback
-  subMapOdom_ = pnh_.subscribe<nav_msgs::Odometry>(
-      LIDAR_MAPPING_TOPIC, 5, &LinsFusion::mapOdometryCallback, this);
-  subImu = pnh_.subscribe<sensor_msgs::Imu>(IMU_TOPIC, 100,
-                                            &LinsFusion::imuCallback, this);
-  subLaserCloud = pnh_.subscribe<sensor_msgs::PointCloud2>(
-      "/segmented_cloud", 2, &LinsFusion::laserCloudCallback, this);
-  subLaserCloudInfo = pnh_.subscribe<cloud_msgs::cloud_info>(
-      "/segmented_cloud_info", 2, &LinsFusion::laserCloudInfoCallback, this);
-  subOutlierCloud = pnh_.subscribe<sensor_msgs::PointCloud2>(
-      "/outlier_cloud", 2, &LinsFusion::outlierCloudCallback, this);
+  subImu = pnh_.subscribe<sensor_msgs::Imu>(IMU_TOPIC, 100, &LinsFusion::imuCallback, this);
+  subLaserCloud = pnh_.subscribe<sensor_msgs::PointCloud2>("/segmented_cloud", 2, &LinsFusion::laserCloudCallback, this);
+  subLaserCloudInfo = pnh_.subscribe<cloud_msgs::cloud_info>("/segmented_cloud_info", 2, &LinsFusion::laserCloudInfoCallback, this);
+  subOutlierCloud = pnh_.subscribe<sensor_msgs::PointCloud2>("/outlier_cloud", 2, &LinsFusion::outlierCloudCallback, this);
 
   // Set publishers
-  pubUndistortedPointCloud =
-      pnh_.advertise<sensor_msgs::PointCloud2>("/undistorted_point_cloud", 1);
+  pubUndistortedPointCloud = pnh_.advertise<sensor_msgs::PointCloud2>("/undistorted_point_cloud", 1);
 
-  pubCornerPointsSharp =
-      pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 1);
-  pubCornerPointsLessSharp =
-      pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_sharp", 1);
-  pubSurfPointsFlat =
-      pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_flat", 1);
-  pubSurfPointsLessFlat =
-      pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 1);
+  pubCornerPointsSharp = pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 1);
+  pubCornerPointsLessSharp = pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_sharp", 1);
+  pubSurfPointsFlat = pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_flat", 1);
+  pubSurfPointsLessFlat = pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 1);
 
-  pubLaserCloudCornerLast =
-      pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_corner_last", 2);
-  pubLaserCloudSurfLast =
-      pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surf_last", 2);
-  pubOutlierCloudLast =
-      pnh_.advertise<sensor_msgs::PointCloud2>("/outlier_cloud_last", 2);
-  pubLaserOdometry =
-      pnh_.advertise<nav_msgs::Odometry>(LIDAR_ODOMETRY_TOPIC, 5);
+  pubLaserCloudCornerLast = pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_corner_last", 2);
+  pubLaserCloudSurfLast = pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surf_last", 2);
+  pubOutlierCloudLast = pnh_.advertise<sensor_msgs::PointCloud2>("/outlier_cloud_last", 2);
+  pubLaserOdometry = pnh_.advertise<nav_msgs::Odometry>(LIDAR_ODOMETRY_TOPIC, 5);
 
   // Set types of the point cloud
   distortedPointCloud.reset(new pcl::PointCloud<PointType>());
@@ -92,47 +79,33 @@ void LinsFusion::initialization() {
 }
 
 void LinsFusion::laserCloudCallback(
-    const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg) {
+    const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
+{
   // Add a new segmented point cloud
   pclBuf_.addMeas(laserCloudMsg, laserCloudMsg->header.stamp.toSec());
 }
 void LinsFusion::laserCloudInfoCallback(
-    const cloud_msgs::cloud_infoConstPtr& cloudInfoMsg) {
+    const cloud_msgs::cloud_infoConstPtr &cloudInfoMsg)
+{
   // Add segmentation information of the point cloud
   cloudInfoBuf_.addMeas(*cloudInfoMsg, cloudInfoMsg->header.stamp.toSec());
 }
 
 void LinsFusion::outlierCloudCallback(
-    const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg) {
+    const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
+{
   outlierBuf_.addMeas(laserCloudMsg, laserCloudMsg->header.stamp.toSec());
 }
 
-void LinsFusion::mapOdometryCallback(
-    const nav_msgs::Odometry::ConstPtr& odometryMsg) {
-  geometry_msgs::Quaternion geoQuat = odometryMsg->pose.pose.orientation;
-  V3D t_yzx(odometryMsg->pose.pose.position.x,
-            odometryMsg->pose.pose.position.y,
-            odometryMsg->pose.pose.position.z);
-  Q4D q_yzx(geoQuat.w, geoQuat.x, geoQuat.y, geoQuat.z);
-  V3D t_xyz = estimator->Q_yzx_to_xyz * t_yzx;
-  Q4D q_xyz =
-      estimator->Q_yzx_to_xyz * q_yzx * estimator->Q_yzx_to_xyz.inverse();
-
-  V3D rpy = math_utils::Q2rpy(q_xyz);
-}
-
-void LinsFusion::imuCallback(const sensor_msgs::Imu::ConstPtr& imuMsg) {
+void LinsFusion::imuCallback(const sensor_msgs::Imu::ConstPtr &imuMsg)
+{
   // Align IMU measurements from IMU frame to vehicle frame
   // two frames share same roll and pitch angles, but with a small
   // misalign-angle in the yaw direction
-  acc_raw_ << imuMsg->linear_acceleration.x, imuMsg->linear_acceleration.y,
-      imuMsg->linear_acceleration.z;
-  gyr_raw_ << imuMsg->angular_velocity.x, imuMsg->angular_velocity.y,
-      imuMsg->angular_velocity.z;
-  misalign_euler_angles_ << deg2rad(0.0), deg2rad(0.0),
-      deg2rad(IMU_MISALIGN_ANGLE);
-  alignIMUtoVehicle(misalign_euler_angles_, acc_raw_, gyr_raw_, acc_aligned_,
-                    gyr_aligned_);
+  acc_raw_ << imuMsg->linear_acceleration.x, imuMsg->linear_acceleration.y, imuMsg->linear_acceleration.z;
+  gyr_raw_ << imuMsg->angular_velocity.x, imuMsg->angular_velocity.y, imuMsg->angular_velocity.z;
+  misalign_euler_angles_ << deg2rad(0.0), deg2rad(0.0), deg2rad(IMU_MISALIGN_ANGLE);
+  alignIMUtoVehicle(misalign_euler_angles_, acc_raw_, gyr_raw_, acc_aligned_, gyr_aligned_);
 
   // Add a new IMU measurement
   Imu imu(imuMsg->header.stamp.toSec(), acc_aligned_, gyr_aligned_);
@@ -142,7 +115,8 @@ void LinsFusion::imuCallback(const sensor_msgs::Imu::ConstPtr& imuMsg) {
   performStateEstimation();
 }
 
-void LinsFusion::processFirstPointCloud() {
+void LinsFusion::processFirstPointCloud()
+{
   // Use the most recent poing cloud to initialize the estimator
   pclBuf_.getLastTime(scan_time_);
 
@@ -174,21 +148,25 @@ void LinsFusion::processFirstPointCloud() {
   outlierBuf_.clean(estimator->getTime());
 }
 
-void LinsFusion::publishTopics() {
-  if (pubLaserCloudCornerLast.getNumSubscribers() != 0) {
+void LinsFusion::publishTopics()
+{
+  if (pubLaserCloudCornerLast.getNumSubscribers() != 0)
+  {
     publishCloudMsg(pubLaserCloudCornerLast,
-                    estimator->scan_last_->cornerPointsLessSharpYZX_,
-                    ros::Time().fromSec(scan_time_), "/camera");
+                    estimator->scan_last_->cornerPointsLessSharp_,
+                    ros::Time().fromSec(scan_time_), "/laser_local");
   }
-  if (pubLaserCloudSurfLast.getNumSubscribers() != 0) {
+  if (pubLaserCloudSurfLast.getNumSubscribers() != 0)
+  {
     publishCloudMsg(pubLaserCloudSurfLast,
-                    estimator->scan_last_->surfPointsLessFlatYZX_,
-                    ros::Time().fromSec(scan_time_), "/camera");
+                    estimator->scan_last_->surfPointsLessFlat_,
+                    ros::Time().fromSec(scan_time_), "/laser_local");
   }
-  if (pubOutlierCloudLast.getNumSubscribers() != 0) {
+  if (pubOutlierCloudLast.getNumSubscribers() != 0)
+  {
     publishCloudMsg(pubOutlierCloudLast,
-                    estimator->scan_last_->outlierPointCloudYZX_,
-                    ros::Time().fromSec(scan_time_), "/camera");
+                    estimator->scan_last_->outlierPointCloud_,
+                    ros::Time().fromSec(scan_time_), "/laser_local");
   }
 
   // Publish the estimated 6-DOF odometry by a YZX-frame convention (e.g. camera
@@ -198,10 +176,11 @@ void LinsFusion::publishTopics() {
   // where X points forward, Y...leftward, Z...upward. Therefore, we have to
   // transforme the odometry from XYZ-convention to YZX-convention to meet the
   // mapping module's requirement.
-  publishOdometryYZX(scan_time_);
+  publishOdometry(scan_time_);
 }
 
-bool LinsFusion::processPointClouds() {
+bool LinsFusion::processPointClouds()
+{
   // Obtain the next PCL
   pclBuf_.itMeas_ = pclBuf_.measMap_.upper_bound(estimator->getTime());
   sensor_msgs::PointCloud2::ConstPtr pclMsg = pclBuf_.itMeas_->second;
@@ -219,7 +198,8 @@ bool LinsFusion::processPointClouds() {
   cloud_msgs::cloud_info cloudInfoMsg = cloudInfoBuf_.itMeas_->second;
 
   imuBuf_.getLastTime(last_imu_time_);
-  if (last_imu_time_ < scan_time_) {
+  if (last_imu_time_ < scan_time_)
+  {
     // ROS_WARN("Wait for more IMU measurement!");
     return false;
   }
@@ -227,10 +207,9 @@ bool LinsFusion::processPointClouds() {
   // Propagate IMU measurements between two consecutive scans
   int imu_couter = 0;
   while (estimator->getTime() < scan_time_ &&
-         (imuBuf_.itMeas_ = imuBuf_.measMap_.upper_bound(
-              estimator->getTime())) != imuBuf_.measMap_.end()) {
-    double dt =
-        std::min(imuBuf_.itMeas_->first, scan_time_) - estimator->getTime();
+         (imuBuf_.itMeas_ = imuBuf_.measMap_.upper_bound(estimator->getTime())) != imuBuf_.measMap_.end())
+  {
+    double dt = std::min(imuBuf_.itMeas_->first, scan_time_) - estimator->getTime();
     Imu imu = imuBuf_.itMeas_->second;
     estimator->processImu(dt, imu.acc, imu.gyr);
   }
@@ -251,21 +230,25 @@ bool LinsFusion::processPointClouds() {
   return true;
 }
 
-void LinsFusion::performStateEstimation() {
+void LinsFusion::performStateEstimation()
+{
   if (imuBuf_.empty() || pclBuf_.empty() || cloudInfoBuf_.empty() ||
       outlierBuf_.empty())
     return;
 
-  if (!estimator->isInitialized()) {
+  if (!estimator->isInitialized())
+  {
     processFirstPointCloud();
     return;
   }
 
   // Iterate all PCL measurements in the buffer
   pclBuf_.getLastTime(last_scan_time_);
-  while (!pclBuf_.empty() && estimator->getTime() < last_scan_time_) {
+  while (!pclBuf_.empty() && estimator->getTime() < last_scan_time_)
+  {
     TicToc ts_total;
-    if (!processPointClouds()) break;
+    if (!processPointClouds())
+      break;
     double time_total = ts_total.toc();
     duration_ = (duration_ * scan_counter_ + time_total) / (scan_counter_ + 1);
     scan_counter_++;
@@ -283,39 +266,47 @@ void LinsFusion::performStateEstimation() {
   }
 }
 
-void LinsFusion::alignIMUtoVehicle(const V3D& rpy, const V3D& acc_in,
-                                   const V3D& gyr_in, V3D& acc_out,
-                                   V3D& gyr_out) {
-  M3D R = rpy2R(rpy);
+void LinsFusion::alignIMUtoVehicle(const V3D &rpy, const V3D &acc_in,
+                                   const V3D &gyr_in, V3D &acc_out,
+                                   V3D &gyr_out)
+{
+  // i2l in l
+  M3D R = Eigen::Matrix3d::Identity();
+  // R << 0.999976, -0.000000, -0.006981,
+  //     0.000000, 1.000000, -0.000000,
+  //     0.006981, 0.000000, 0.999976;
+  // Eigen::Vector3d T(-0.3, 0, 0.02);
+
   acc_out = R.transpose() * acc_in;
   gyr_out = R.transpose() * gyr_in;
 }
 
-void LinsFusion::publishOdometryYZX(double timeStamp) {
-  laserOdometry.header.frame_id = "/camera_init";
+void LinsFusion::publishOdometry(double timeStamp)
+{
+  laserOdometry.header.frame_id = "/world";
   laserOdometry.child_frame_id = "/laser_odom";
   laserOdometry.header.stamp = ros::Time().fromSec(timeStamp);
-  laserOdometry.pose.pose.orientation.x = estimator->globalStateYZX_.qbn_.x();
-  laserOdometry.pose.pose.orientation.y = estimator->globalStateYZX_.qbn_.y();
-  laserOdometry.pose.pose.orientation.z = estimator->globalStateYZX_.qbn_.z();
-  laserOdometry.pose.pose.orientation.w = estimator->globalStateYZX_.qbn_.w();
-  laserOdometry.pose.pose.position.x = estimator->globalStateYZX_.rn_[0];
-  laserOdometry.pose.pose.position.y = estimator->globalStateYZX_.rn_[1];
-  laserOdometry.pose.pose.position.z = estimator->globalStateYZX_.rn_[2];
+  laserOdometry.pose.pose.orientation.x = estimator->globalState_.qbn_.x();
+  laserOdometry.pose.pose.orientation.y = estimator->globalState_.qbn_.y();
+  laserOdometry.pose.pose.orientation.z = estimator->globalState_.qbn_.z();
+  laserOdometry.pose.pose.orientation.w = estimator->globalState_.qbn_.w();
+  laserOdometry.pose.pose.position.x = estimator->globalState_.rn_[0];
+  laserOdometry.pose.pose.position.y = estimator->globalState_.rn_[1];
+  laserOdometry.pose.pose.position.z = estimator->globalState_.rn_[2];
   pubLaserOdometry.publish(laserOdometry);
 
   tf::TransformBroadcaster tfBroadcaster;
   tf::StampedTransform laserOdometryTrans;
-  laserOdometryTrans.frame_id_ = "/camera_init";
+  laserOdometryTrans.frame_id_ = "/world";
   laserOdometryTrans.child_frame_id_ = "/laser_odom";
   laserOdometryTrans.stamp_ = ros::Time().fromSec(timeStamp);
   laserOdometryTrans.setRotation(tf::Quaternion(
-      estimator->globalStateYZX_.qbn_.x(), estimator->globalStateYZX_.qbn_.y(),
-      estimator->globalStateYZX_.qbn_.z(),
-      estimator->globalStateYZX_.qbn_.w()));
-  laserOdometryTrans.setOrigin(tf::Vector3(estimator->globalStateYZX_.rn_[0],
-                                           estimator->globalStateYZX_.rn_[1],
-                                           estimator->globalStateYZX_.rn_[2]));
+      estimator->globalState_.qbn_.x(), estimator->globalState_.qbn_.y(),
+      estimator->globalState_.qbn_.z(),
+      estimator->globalState_.qbn_.w()));
+  laserOdometryTrans.setOrigin(tf::Vector3(estimator->globalState_.rn_[0],
+                                           estimator->globalState_.rn_[1],
+                                           estimator->globalState_.rn_[2]));
   tfBroadcaster.sendTransform(laserOdometryTrans);
 }
 
@@ -345,4 +336,4 @@ void LinsFusion::publishOdometryYZX(double timeStamp) {
 //   }
 // }
 
-}  // namespace fusion
+} // namespace fusion

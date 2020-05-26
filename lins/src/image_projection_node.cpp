@@ -30,8 +30,9 @@
 
 using namespace parameter;
 
-class ImageProjection {
- private:
+class ImageProjection
+{
+private:
   ros::NodeHandle nh;
   ros::NodeHandle pnh;
 
@@ -69,35 +70,29 @@ class ImageProjection {
   cloud_msgs::cloud_info segMsg;
   std_msgs::Header cloudHeader;
 
-  std::vector<std::pair<uint8_t, uint8_t> > neighborIterator;
+  std::vector<std::pair<uint8_t, uint8_t>> neighborIterator;
 
-  uint16_t* allPushedIndX;
-  uint16_t* allPushedIndY;
+  uint16_t *allPushedIndX;
+  uint16_t *allPushedIndY;
 
-  uint16_t* queueIndX;
-  uint16_t* queueIndY;
+  uint16_t *queueIndX;
+  uint16_t *queueIndY;
 
- public:
-  ImageProjection(ros::NodeHandle& nh, ros::NodeHandle& pnh)
-      : nh(nh), pnh(pnh) {
+public:
+  ImageProjection(ros::NodeHandle &nh, ros::NodeHandle &pnh)
+      : nh(nh), pnh(pnh)
+  {
     subLaserCloud = pnh.subscribe<sensor_msgs::PointCloud2>(
         LIDAR_TOPIC, 1, &ImageProjection::cloudHandler, this);
 
-    pubFullCloud =
-        pnh.advertise<sensor_msgs::PointCloud2>("/full_cloud_projected", 1);
-    pubFullInfoCloud =
-        pnh.advertise<sensor_msgs::PointCloud2>("/full_cloud_info", 1);
+    pubFullCloud = pnh.advertise<sensor_msgs::PointCloud2>("/full_cloud_projected", 1);
+    pubFullInfoCloud = pnh.advertise<sensor_msgs::PointCloud2>("/full_cloud_info", 1);
 
-    pubGroundCloud =
-        pnh.advertise<sensor_msgs::PointCloud2>("/ground_cloud", 1);
-    pubSegmentedCloud =
-        pnh.advertise<sensor_msgs::PointCloud2>("/segmented_cloud", 1);
-    pubSegmentedCloudPure =
-        pnh.advertise<sensor_msgs::PointCloud2>("/segmented_cloud_pure", 1);
-    pubSegmentedCloudInfo =
-        pnh.advertise<cloud_msgs::cloud_info>("/segmented_cloud_info", 1);
-    pubOutlierCloud =
-        pnh.advertise<sensor_msgs::PointCloud2>("/outlier_cloud", 1);
+    pubGroundCloud = pnh.advertise<sensor_msgs::PointCloud2>("/ground_cloud", 1);
+    pubSegmentedCloud = pnh.advertise<sensor_msgs::PointCloud2>("/segmented_cloud", 1);
+    pubSegmentedCloudPure = pnh.advertise<sensor_msgs::PointCloud2>("/segmented_cloud_pure", 1);
+    pubSegmentedCloudInfo = pnh.advertise<cloud_msgs::cloud_info>("/segmented_cloud_info", 1);
+    pubOutlierCloud = pnh.advertise<sensor_msgs::PointCloud2>("/outlier_cloud", 1);
 
     nanPoint.x = std::numeric_limits<float>::quiet_NaN();
     nanPoint.y = std::numeric_limits<float>::quiet_NaN();
@@ -108,7 +103,8 @@ class ImageProjection {
     resetParameters();
   }
 
-  void allocateMemory() {
+  void allocateMemory()
+  {
     laserCloudIn.reset(new pcl::PointCloud<PointType>());
 
     fullCloud.reset(new pcl::PointCloud<PointType>());
@@ -150,7 +146,8 @@ class ImageProjection {
     queueIndY = new uint16_t[LINE_NUM * SCAN_NUM];
   }
 
-  void resetParameters() {
+  void resetParameters()
+  {
     laserCloudIn->clear();
     groundCloud->clear();
     segmentedCloud->clear();
@@ -169,14 +166,16 @@ class ImageProjection {
 
   ~ImageProjection() {}
 
-  void copyPointCloud(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg) {
+  void copyPointCloud(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
+  {
     cloudHeader = laserCloudMsg->header;
     pcl::fromROSMsg(*laserCloudMsg, *laserCloudIn);
     std::vector<int> indices;
     pcl::removeNaNFromPointCloud(*laserCloudIn, *laserCloudIn, indices);
   }
 
-  void cloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg) {
+  void cloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
+  {
     TicToc ts_total;
     copyPointCloud(laserCloudMsg);
     findStartEndAngle();
@@ -188,28 +187,33 @@ class ImageProjection {
     double time_total = ts_total.toc();
   }
 
-  void findStartEndAngle() {
+  void findStartEndAngle()
+  {
     segMsg.startOrientation =
         -atan2(laserCloudIn->points[0].y, laserCloudIn->points[0].x);
     segMsg.endOrientation =
         -atan2(laserCloudIn->points[laserCloudIn->points.size() - 1].y,
                laserCloudIn->points[laserCloudIn->points.size() - 2].x) +
         2 * M_PI;
-    if (segMsg.endOrientation - segMsg.startOrientation > 3 * M_PI) {
+    if (segMsg.endOrientation - segMsg.startOrientation > 3 * M_PI)
+    {
       segMsg.endOrientation -= 2 * M_PI;
-    } else if (segMsg.endOrientation - segMsg.startOrientation < M_PI)
+    }
+    else if (segMsg.endOrientation - segMsg.startOrientation < M_PI)
       segMsg.endOrientation += 2 * M_PI;
     segMsg.orientationDiff = segMsg.endOrientation - segMsg.startOrientation;
   }
 
-  void projectPointCloud() {
+  void projectPointCloud()
+  {
     float verticalAngle, horizonAngle, range;
     size_t rowIdn, columnIdn, index, cloudSize;
     PointType thisPoint;
 
     cloudSize = laserCloudIn->points.size();
 
-    for (size_t i = 0; i < cloudSize; ++i) {
+    for (size_t i = 0; i < cloudSize; ++i)
+    {
       thisPoint.x = laserCloudIn->points[i].x;
       thisPoint.y = laserCloudIn->points[i].y;
       thisPoint.z = laserCloudIn->points[i].z;
@@ -218,14 +222,17 @@ class ImageProjection {
                                               thisPoint.y * thisPoint.y)) *
                       180 / M_PI;
       rowIdn = (verticalAngle + ang_bottom) / ang_res_y;
-      if (rowIdn < 0 || rowIdn >= LINE_NUM) continue;
+      if (rowIdn < 0 || rowIdn >= LINE_NUM)
+        continue;
 
       horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
 
       columnIdn = -round((horizonAngle - 90.0) / ang_res_x) + SCAN_NUM / 2;
-      if (columnIdn >= SCAN_NUM) columnIdn -= SCAN_NUM;
+      if (columnIdn >= SCAN_NUM)
+        columnIdn -= SCAN_NUM;
 
-      if (columnIdn < 0 || columnIdn >= SCAN_NUM) continue;
+      if (columnIdn < 0 || columnIdn >= SCAN_NUM)
+        continue;
 
       range = sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y +
                    thisPoint.z * thisPoint.z);
@@ -240,17 +247,21 @@ class ImageProjection {
     }
   }
 
-  void groundRemoval() {
+  void groundRemoval()
+  {
     size_t lowerInd, upperInd;
     float diffX, diffY, diffZ, angle;
 
-    for (size_t j = 0; j < SCAN_NUM; ++j) {
-      for (size_t i = 0; i < groundScanInd; ++i) {
+    for (size_t j = 0; j < SCAN_NUM; ++j)
+    {
+      for (size_t i = 0; i < groundScanInd; ++i)
+      {
         lowerInd = j + (i)*SCAN_NUM;
         upperInd = j + (i + 1) * SCAN_NUM;
 
         if (fullCloud->points[lowerInd].intensity == -1 ||
-            fullCloud->points[upperInd].intensity == -1) {
+            fullCloud->points[upperInd].intensity == -1)
+        {
           groundMat.at<int8_t>(i, j) = -1;
           continue;
         }
@@ -261,24 +272,31 @@ class ImageProjection {
 
         angle = atan2(diffZ, sqrt(diffX * diffX + diffY * diffY)) * 180 / M_PI;
 
-        if (abs(angle - sensorMountAngle) <= 10) {
+        if (abs(angle - sensorMountAngle) <= 10)
+        {
           groundMat.at<int8_t>(i, j) = 1;
           groundMat.at<int8_t>(i + 1, j) = 1;
         }
       }
     }
 
-    for (size_t i = 0; i < LINE_NUM; ++i) {
-      for (size_t j = 0; j < SCAN_NUM; ++j) {
+    for (size_t i = 0; i < LINE_NUM; ++i)
+    {
+      for (size_t j = 0; j < SCAN_NUM; ++j)
+      {
         if (groundMat.at<int8_t>(i, j) == 1 ||
-            rangeMat.at<float>(i, j) == FLT_MAX) {
+            rangeMat.at<float>(i, j) == FLT_MAX)
+        {
           labelMat.at<int>(i, j) = -1;
         }
       }
     }
-    if (pubGroundCloud.getNumSubscribers() != 0) {
-      for (size_t i = 0; i <= groundScanInd; ++i) {
-        for (size_t j = 0; j < SCAN_NUM; ++j) {
+    if (pubGroundCloud.getNumSubscribers() != 0)
+    {
+      for (size_t i = 0; i <= groundScanInd; ++i)
+      {
+        for (size_t j = 0; j < SCAN_NUM; ++j)
+        {
           if (groundMat.at<int8_t>(i, j) == 1)
             groundCloud->push_back(fullCloud->points[j + i * SCAN_NUM]);
         }
@@ -286,27 +304,38 @@ class ImageProjection {
     }
   }
 
-  void cloudSegmentation() {
+  void cloudSegmentation()
+  {
     for (size_t i = 0; i < LINE_NUM; ++i)
       for (size_t j = 0; j < SCAN_NUM; ++j)
-        if (labelMat.at<int>(i, j) == 0) labelComponents(i, j);
+        if (labelMat.at<int>(i, j) == 0)
+          labelComponents(i, j);
 
     int sizeOfSegCloud = 0;
-    for (size_t i = 0; i < LINE_NUM; ++i) {
+    for (size_t i = 0; i < LINE_NUM; ++i)
+    {
       segMsg.startRingIndex[i] = sizeOfSegCloud - 1 + 5;
 
-      for (size_t j = 0; j < SCAN_NUM; ++j) {
-        if (labelMat.at<int>(i, j) > 0 || groundMat.at<int8_t>(i, j) == 1) {
-          if (labelMat.at<int>(i, j) == 999999) {
-            if (i > groundScanInd && j % 5 == 0) {
+      for (size_t j = 0; j < SCAN_NUM; ++j)
+      {
+        if (labelMat.at<int>(i, j) > 0 || groundMat.at<int8_t>(i, j) == 1)
+        {
+          if (labelMat.at<int>(i, j) == 999999)
+          {
+            if (i > groundScanInd && j % 5 == 0)
+            {
               outlierCloud->push_back(fullCloud->points[j + i * SCAN_NUM]);
               continue;
-            } else {
+            }
+            else
+            {
               continue;
             }
           }
-          if (groundMat.at<int8_t>(i, j) == 1) {
-            if (j % 5 != 0 && j > 5 && j < SCAN_NUM - 5) continue;
+          if (groundMat.at<int8_t>(i, j) == 1)
+          {
+            if (j % 5 != 0 && j > 5 && j < SCAN_NUM - 5)
+              continue;
           }
           segMsg.segmentedCloudGroundFlag[sizeOfSegCloud] =
               (groundMat.at<int8_t>(i, j) == 1);
@@ -320,10 +349,14 @@ class ImageProjection {
       segMsg.endRingIndex[i] = sizeOfSegCloud - 1 - 5;
     }
 
-    if (pubSegmentedCloudPure.getNumSubscribers() != 0) {
-      for (size_t i = 0; i < LINE_NUM; ++i) {
-        for (size_t j = 0; j < SCAN_NUM; ++j) {
-          if (labelMat.at<int>(i, j) > 0 && labelMat.at<int>(i, j) != 999999) {
+    if (pubSegmentedCloudPure.getNumSubscribers() != 0)
+    {
+      for (size_t i = 0; i < LINE_NUM; ++i)
+      {
+        for (size_t j = 0; j < SCAN_NUM; ++j)
+        {
+          if (labelMat.at<int>(i, j) > 0 && labelMat.at<int>(i, j) != 999999)
+          {
             segmentedCloudPure->push_back(fullCloud->points[j + i * SCAN_NUM]);
             segmentedCloudPure->points.back().intensity =
                 labelMat.at<int>(i, j);
@@ -333,7 +366,8 @@ class ImageProjection {
     }
   }
 
-  void labelComponents(int row, int col) {
+  void labelComponents(int row, int col)
+  {
     float d1, d2, alpha, angle;
     int fromIndX, fromIndY, thisIndX, thisIndY;
     bool lineCountFlag[LINE_NUM] = {false};
@@ -348,7 +382,8 @@ class ImageProjection {
     allPushedIndY[0] = col;
     int allPushedIndSize = 1;
 
-    while (queueSize > 0) {
+    while (queueSize > 0)
+    {
       fromIndX = queueIndX[queueStartInd];
       fromIndY = queueIndY[queueStartInd];
       --queueSize;
@@ -356,16 +391,21 @@ class ImageProjection {
       labelMat.at<int>(fromIndX, fromIndY) = labelCount;
 
       for (auto iter = neighborIterator.begin(); iter != neighborIterator.end();
-           ++iter) {
+           ++iter)
+      {
         thisIndX = fromIndX + (*iter).first;
         thisIndY = fromIndY + (*iter).second;
 
-        if (thisIndX < 0 || thisIndX >= LINE_NUM) continue;
+        if (thisIndX < 0 || thisIndX >= LINE_NUM)
+          continue;
 
-        if (thisIndY < 0) thisIndY = SCAN_NUM - 1;
-        if (thisIndY >= SCAN_NUM) thisIndY = 0;
+        if (thisIndY < 0)
+          thisIndY = SCAN_NUM - 1;
+        if (thisIndY >= SCAN_NUM)
+          thisIndY = 0;
 
-        if (labelMat.at<int>(thisIndX, thisIndY) != 0) continue;
+        if (labelMat.at<int>(thisIndX, thisIndY) != 0)
+          continue;
 
         d1 = std::max(rangeMat.at<float>(fromIndX, fromIndY),
                       rangeMat.at<float>(thisIndX, thisIndY));
@@ -379,7 +419,8 @@ class ImageProjection {
 
         angle = atan2(d2 * sin(alpha), (d1 - d2 * cos(alpha)));
 
-        if (angle > segmentTheta) {
+        if (angle > segmentTheta)
+        {
           queueIndX[queueEndInd] = thisIndX;
           queueIndY[queueEndInd] = thisIndY;
           ++queueSize;
@@ -398,23 +439,31 @@ class ImageProjection {
     bool feasibleSegment = false;
     if (allPushedIndSize >= 30)
       feasibleSegment = true;
-    else if (allPushedIndSize >= segmentValidPointNum) {
+    else if (allPushedIndSize >= segmentValidPointNum)
+    {
       int lineCount = 0;
       for (size_t i = 0; i < LINE_NUM; ++i)
-        if (lineCountFlag[i] == true) ++lineCount;
-      if (lineCount >= segmentValidLineNum) feasibleSegment = true;
+        if (lineCountFlag[i] == true)
+          ++lineCount;
+      if (lineCount >= segmentValidLineNum)
+        feasibleSegment = true;
     }
 
-    if (feasibleSegment == true) {
+    if (feasibleSegment == true)
+    {
       ++labelCount;
-    } else {
-      for (size_t i = 0; i < allPushedIndSize; ++i) {
+    }
+    else
+    {
+      for (size_t i = 0; i < allPushedIndSize; ++i)
+      {
         labelMat.at<int>(allPushedIndX[i], allPushedIndY[i]) = 999999;
       }
     }
   }
 
-  void publishCloud() {
+  void publishCloud()
+  {
     segMsg.header = cloudHeader;
     pubSegmentedCloudInfo.publish(segMsg);
 
@@ -430,28 +479,32 @@ class ImageProjection {
     laserCloudTemp.header.frame_id = "base_link";
     pubSegmentedCloud.publish(laserCloudTemp);
 
-    if (pubFullCloud.getNumSubscribers() != 0) {
+    if (pubFullCloud.getNumSubscribers() != 0)
+    {
       pcl::toROSMsg(*fullCloud, laserCloudTemp);
       laserCloudTemp.header.stamp = cloudHeader.stamp;
       laserCloudTemp.header.frame_id = "base_link";
       pubFullCloud.publish(laserCloudTemp);
     }
 
-    if (pubGroundCloud.getNumSubscribers() != 0) {
+    if (pubGroundCloud.getNumSubscribers() != 0)
+    {
       pcl::toROSMsg(*groundCloud, laserCloudTemp);
       laserCloudTemp.header.stamp = cloudHeader.stamp;
       laserCloudTemp.header.frame_id = "base_link";
       pubGroundCloud.publish(laserCloudTemp);
     }
 
-    if (pubSegmentedCloudPure.getNumSubscribers() != 0) {
+    if (pubSegmentedCloudPure.getNumSubscribers() != 0)
+    {
       pcl::toROSMsg(*segmentedCloudPure, laserCloudTemp);
       laserCloudTemp.header.stamp = cloudHeader.stamp;
       laserCloudTemp.header.frame_id = "base_link";
       pubSegmentedCloudPure.publish(laserCloudTemp);
     }
 
-    if (pubFullInfoCloud.getNumSubscribers() != 0) {
+    if (pubFullInfoCloud.getNumSubscribers() != 0)
+    {
       pcl::toROSMsg(*fullInfoCloud, laserCloudTemp);
       laserCloudTemp.header.stamp = cloudHeader.stamp;
       laserCloudTemp.header.frame_id = "base_link";
@@ -460,14 +513,13 @@ class ImageProjection {
   }
 };
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
   ros::init(argc, argv, "image_projection_node");
   ros::NodeHandle nh;
   ros::NodeHandle pnh("~");
 
-
   parameter::readParameters(pnh);
-
 
   ImageProjection featureHandler(nh, pnh);
 

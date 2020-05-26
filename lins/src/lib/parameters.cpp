@@ -17,7 +17,8 @@
 
 #include <parameters.h>
 
-namespace parameter {
+namespace parameter
+{
 
 // !@ENABLE_CALIBRATION
 int CALIBARTE_IMU;
@@ -72,22 +73,28 @@ V3D INIT_TBL;
 Q4D INIT_RBL;
 
 template <typename T>
-T readParam(ros::NodeHandle& n, std::string name) {
+T readParam(ros::NodeHandle &n, std::string name)
+{
   T ans;
-  if (n.getParam(name, ans)) {
+  if (n.getParam(name, ans))
+  {
     // ROS_INFO_STREAM("Loaded " << name << ": " << ans);
-  } else {
+  }
+  else
+  {
     ROS_ERROR_STREAM("Failed to load " << name);
     n.shutdown();
   }
   return ans;
 }
 
-void readParameters(ros::NodeHandle& n) {
+void readParameters(ros::NodeHandle &n)
+{
   std::string config_file;
   config_file = readParam<std::string>(n, "config_file");
   cv::FileStorage fsSettings(config_file, cv::FileStorage::READ);
-  if (!fsSettings.isOpened()) {
+  if (!fsSettings.isOpened())
+  {
     std::cerr << "ERROR: Wrong path to settings" << std::endl;
   }
 
@@ -131,15 +138,17 @@ void readParameters(ros::NodeHandle& n) {
   readQ4D(&fsSettings, "init_rbl", INIT_RBL);
 }
 
-void readV3D(cv::FileStorage* file, const std::__cxx11::string& name,
-             V3D& vec_eigen) {
+void readV3D(cv::FileStorage *file, const std::__cxx11::string &name,
+             V3D &vec_eigen)
+{
   cv::Mat vec_cv;
   (*file)[name] >> vec_cv;
   cv::cv2eigen(vec_cv, vec_eigen);
 }
 
-void readQ4D(cv::FileStorage* file, const std::__cxx11::string& name,
-             Q4D& quat_eigen) {
+void readQ4D(cv::FileStorage *file, const std::__cxx11::string &name,
+             Q4D &quat_eigen)
+{
   cv::Mat mat_cv;
   (*file)[name] >> mat_cv;
   M3D mat_eigen;
@@ -148,4 +157,4 @@ void readQ4D(cv::FileStorage* file, const std::__cxx11::string& name,
   quat_eigen = quat.normalized();
 }
 
-}  // namespace parameter
+} // namespace parameter

@@ -20,7 +20,8 @@
 #include <parameters.h>
 #include <Estimator.h>
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
   ros::init(argc, argv, "lins_fusion_node");
   ros::NodeHandle nh;
   ros::NodeHandle pnh("~");

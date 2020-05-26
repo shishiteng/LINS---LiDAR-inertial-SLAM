@@ -28,12 +28,14 @@ using namespace std;
 using namespace math_utils;
 using namespace parameter;
 
-namespace filter {
+namespace filter
+{
 
 // GlobalState Class contains state variables including position, velocity,
 // attitude, acceleration bias, gyroscope bias, and gravity
-class GlobalState {
- public:
+class GlobalState
+{
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   static constexpr unsigned int DIM_OF_STATE_ = 18;
   static constexpr unsigned int DIM_OF_NOISE_ = 12;
@@ -46,8 +48,9 @@ class GlobalState {
 
   GlobalState() { setIdentity(); }
 
-  GlobalState(const V3D& rn, const V3D& vn, const Q4D& qbn, const V3D& ba,
-              const V3D& bw) {
+  GlobalState(const V3D &rn, const V3D &vn, const Q4D &qbn, const V3D &ba,
+              const V3D &bw)
+  {
     setIdentity();
     rn_ = rn;
     vn_ = vn;
@@ -58,7 +61,8 @@ class GlobalState {
 
   ~GlobalState() {}
 
-  void setIdentity() {
+  void setIdentity()
+  {
     rn_.setZero();
     vn_.setZero();
     qbn_.setIdentity();
@@ -68,8 +72,9 @@ class GlobalState {
   }
 
   // boxPlus operator
-  void boxPlus(const Eigen::Matrix<double, DIM_OF_STATE_, 1>& xk,
-               GlobalState& stateOut) {
+  void boxPlus(const Eigen::Matrix<double, DIM_OF_STATE_, 1> &xk,
+               GlobalState &stateOut)
+  {
     stateOut.rn_ = rn_ + xk.template segment<3>(pos_);
     stateOut.vn_ = vn_ + xk.template segment<3>(vel_);
     stateOut.ba_ = ba_ + xk.template segment<3>(acc_);
@@ -81,8 +86,9 @@ class GlobalState {
   }
 
   // boxMinus operator
-  void boxMinus(const GlobalState& stateIn,
-                Eigen::Matrix<double, DIM_OF_STATE_, 1>& xk) {
+  void boxMinus(const GlobalState &stateIn,
+                Eigen::Matrix<double, DIM_OF_STATE_, 1> &xk)
+  {
     xk.template segment<3>(pos_) = rn_ - stateIn.rn_;
     xk.template segment<3>(vel_) = vn_ - stateIn.vn_;
     xk.template segment<3>(acc_) = ba_ - stateIn.ba_;
@@ -93,8 +99,10 @@ class GlobalState {
     xk.template segment<3>(gra_) = gn_ - stateIn.gn_;
   }
 
-  GlobalState& operator=(const GlobalState& other) {
-    if (this == &other) return *this;
+  GlobalState &operator=(const GlobalState &other)
+  {
+    if (this == &other)
+      return *this;
 
     this->rn_ = other.rn_;
     this->vn_ = other.vn_;
@@ -107,26 +115,29 @@ class GlobalState {
   }
 
   // !@State
-  V3D rn_;   // position in n-frame
-  V3D vn_;   // velocity in n-frame
-  Q4D qbn_;  // rotation from b-frame to n-frame
-  V3D ba_;   // acceleartion bias
-  V3D bw_;   // gyroscope bias
-  V3D gn_;   // gravity
+  V3D rn_;  // position in n-frame
+  V3D vn_;  // velocity in n-frame
+  Q4D qbn_; // rotation from b-frame to n-frame
+  V3D ba_;  // acceleartion bias
+  V3D bw_;  // gyroscope bias
+  V3D gn_;  // gravity
 };
 
-class StatePredictor {
- public:
+class StatePredictor
+{
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   StatePredictor() { reset(); }
 
   ~StatePredictor() {}
 
-  bool predict(double dt, const V3D& acc, const V3D& gyr,
-               bool update_jacobian_ = true) {
-    if (!isInitialized()) return false;
+  bool predict(double dt, const V3D &acc, const V3D &gyr, bool update_jacobian_ = true)
+  {
+    if (!isInitialized())
+      return false;
 
-    if (!flag_init_imu_) {
+    if (!flag_init_imu_)
+    {
       flag_init_imu_ = true;
       acc_last = acc;
       gyr_last = gyr;
@@ -145,9 +156,9 @@ class StatePredictor {
     state_tmp.rn_ = state_tmp.rn_ + dt * state_tmp.vn_ + 0.5 * dt * dt * un_acc;
     state_tmp.vn_ = state_tmp.vn_ + dt * un_acc;
 
-    if (update_jacobian_) {
-      MXD Ft =
-          MXD::Zero(GlobalState::DIM_OF_STATE_, GlobalState::DIM_OF_STATE_);
+    if (update_jacobian_)
+    {
+      MXD Ft = MXD::Zero(GlobalState::DIM_OF_STATE_, GlobalState::DIM_OF_STATE_);
       Ft.block<3, 3>(GlobalState::pos_, GlobalState::vel_) = M3D::Identity();
 
       Ft.block<3, 3>(GlobalState::vel_, GlobalState::att_) =
@@ -157,24 +168,21 @@ class StatePredictor {
       Ft.block<3, 3>(GlobalState::vel_, GlobalState::gra_) = M3D::Identity();
 
       Ft.block<3, 3>(GlobalState::att_, GlobalState::att_) =
-          - skew(gyr - state_tmp.bw_);
+          -skew(gyr - state_tmp.bw_);
       Ft.block<3, 3>(GlobalState::att_, GlobalState::gyr_) = -M3D::Identity();
 
-      MXD Gt =
-          MXD::Zero(GlobalState::DIM_OF_STATE_, GlobalState::DIM_OF_NOISE_);
+      MXD Gt = MXD::Zero(GlobalState::DIM_OF_STATE_, GlobalState::DIM_OF_NOISE_);
       Gt.block<3, 3>(GlobalState::vel_, 0) = -state_tmp.qbn_.toRotationMatrix();
       Gt.block<3, 3>(GlobalState::att_, 3) = -M3D::Identity();
       Gt.block<3, 3>(GlobalState::acc_, 6) = M3D::Identity();
       Gt.block<3, 3>(GlobalState::gyr_, 9) = M3D::Identity();
       Gt = Gt * dt;
 
-      const MXD I =
-          MXD::Identity(GlobalState::DIM_OF_STATE_, GlobalState::DIM_OF_STATE_);
+      const MXD I = MXD::Identity(GlobalState::DIM_OF_STATE_, GlobalState::DIM_OF_STATE_);
       F_ = I + Ft * dt + 0.5 * Ft * Ft * dt * dt;
 
       // jacobian_ = F * jacobian_;
-      covariance_ =
-          F_ * covariance_ * F_.transpose() + Gt * noise_ * Gt.transpose();
+      covariance_ = F_ * covariance_ * F_.transpose() + Gt * noise_ * Gt.transpose();
       covariance_ = 0.5 * (covariance_ + covariance_.transpose()).eval();
     }
 
@@ -185,22 +193,24 @@ class StatePredictor {
     return true;
   }
 
-  static void calculateRPfromIMU(const V3D& acc, double& roll, double& pitch) {
+  static void calculateRPfromIMU(const V3D &acc, double &roll, double &pitch)
+  {
     pitch = -sign(acc.z()) * asin(acc.x() / G0);
     roll = sign(acc.z()) * asin(acc.y() / G0);
   }
 
-  void set(const GlobalState& state) { state_ = state; }
+  void set(const GlobalState &state) { state_ = state; }
 
-  void update(const GlobalState& state,
-              const Eigen::Matrix<double, GlobalState::DIM_OF_STATE_,
-                                  GlobalState::DIM_OF_STATE_>& covariance) {
+  void update(const GlobalState &state,
+              const Eigen::Matrix<double, GlobalState::DIM_OF_STATE_, GlobalState::DIM_OF_STATE_> &covariance)
+  {
     state_ = state;
     covariance_ = covariance;
   }
 
-  void initialization(double time, const V3D& rn, const V3D& vn, const Q4D& qbn,
-                      const V3D& ba, const V3D& bw) {
+  void initialization(double time, const V3D &rn, const V3D &vn, const Q4D &qbn,
+                      const V3D &ba, const V3D &bw)
+  {
     state_ = GlobalState(rn, vn, qbn, ba, bw);
     time_ = time;
     flag_init_state_ = true;
@@ -208,9 +218,10 @@ class StatePredictor {
     initializeCovariance();
   }
 
-  void initialization(double time, const V3D& rn, const V3D& vn, const Q4D& qbn,
-                      const V3D& ba, const V3D& bw, const V3D& acc,
-                      const V3D& gyr) {
+  void initialization(double time, const V3D &rn, const V3D &vn, const Q4D &qbn,
+                      const V3D &ba, const V3D &bw, const V3D &acc,
+                      const V3D &gyr)
+  {
     state_ = GlobalState(rn, vn, qbn, ba, bw);
     time_ = time;
     acc_last = acc;
@@ -221,9 +232,10 @@ class StatePredictor {
     initializeCovariance();
   }
 
-  void initialization(double time, const V3D& rn, const V3D& vn, const V3D& ba,
-                      const V3D& bw, double roll = 0.0, double pitch = 0.0,
-                      double yaw = 0.0) {
+  void initialization(double time, const V3D &rn, const V3D &vn, const V3D &ba,
+                      const V3D &bw, double roll = 0.0, double pitch = 0.0,
+                      double yaw = 0.0)
+  {
     state_ = GlobalState(rn, vn, rpy2Quat(V3D(roll, pitch, yaw)), ba, bw);
     time_ = time;
     flag_init_state_ = true;
@@ -231,9 +243,10 @@ class StatePredictor {
     initializeCovariance();
   }
 
-  void initialization(double time, const V3D& rn, const V3D& vn, const V3D& ba,
-                      const V3D& bw, const V3D& acc, const V3D& gyr,
-                      double roll = 0.0, double pitch = 0.0, double yaw = 0.0) {
+  void initialization(double time, const V3D &rn, const V3D &vn, const V3D &ba,
+                      const V3D &bw, const V3D &acc, const V3D &gyr,
+                      double roll = 0.0, double pitch = 0.0, double yaw = 0.0)
+  {
     state_ = GlobalState(rn, vn, rpy2Quat(V3D(roll, pitch, yaw)), ba, bw);
     time_ = time;
     acc_last = acc;
@@ -244,7 +257,8 @@ class StatePredictor {
     initializeCovariance();
   }
 
-  void initializeCovariance(int type = 0) {
+  void initializeCovariance(int type = 0)
+  {
     double covX = pow(INIT_POS_STD(0), 2);
     double covY = pow(INIT_POS_STD(1), 2);
     double covZ = pow(INIT_POS_STD(2), 2);
@@ -266,22 +280,25 @@ class StatePredictor {
     double pwebg = pow(GYR_W * dpsh, 2);
     V3D gra_cov(0.01, 0.01, 0.01);
 
-    if (type == 0) {
+    if (type == 0)
+    {
       // Initialize using offline parameters
       covariance_.setZero();
       covariance_.block<3, 3>(GlobalState::pos_, GlobalState::pos_) =
-          covPos.asDiagonal();  // pos
+          covPos.asDiagonal(); // pos
       covariance_.block<3, 3>(GlobalState::vel_, GlobalState::vel_) =
-          covVel.asDiagonal();  // vel
+          covVel.asDiagonal(); // vel
       covariance_.block<3, 3>(GlobalState::att_, GlobalState::att_) =
-          V3D(covRoll, covPitch, covYaw).asDiagonal();  // att
+          V3D(covRoll, covPitch, covYaw).asDiagonal(); // att
       covariance_.block<3, 3>(GlobalState::acc_, GlobalState::acc_) =
-          covAcc.asDiagonal();  // ba
+          covAcc.asDiagonal(); // ba
       covariance_.block<3, 3>(GlobalState::gyr_, GlobalState::gyr_) =
-          covGyr.asDiagonal();  // bg
+          covGyr.asDiagonal(); // bg
       covariance_.block<3, 3>(GlobalState::gra_, GlobalState::gra_) =
-          gra_cov.asDiagonal();  // gravity
-    } else if (type == 1) {
+          gra_cov.asDiagonal(); // gravity
+    }
+    else if (type == 1)
+    {
       // Inheritage previous covariance
       M3D vel_cov =
           covariance_.block<3, 3>(GlobalState::vel_, GlobalState::vel_);
@@ -294,11 +311,11 @@ class StatePredictor {
 
       covariance_.setZero();
       covariance_.block<3, 3>(GlobalState::pos_, GlobalState::pos_) =
-          covPos.asDiagonal();  // pos
+          covPos.asDiagonal(); // pos
       covariance_.block<3, 3>(GlobalState::vel_, GlobalState::vel_) =
-          vel_cov;  // vel
+          vel_cov; // vel
       covariance_.block<3, 3>(GlobalState::att_, GlobalState::att_) =
-          V3D(covRoll, covPitch, covYaw).asDiagonal();  // att
+          V3D(covRoll, covPitch, covYaw).asDiagonal(); // att
       covariance_.block<3, 3>(GlobalState::acc_, GlobalState::acc_) = acc_cov;
       covariance_.block<3, 3>(GlobalState::gyr_, GlobalState::gyr_) = gyr_cov;
       covariance_.block<3, 3>(GlobalState::gra_, GlobalState::gra_) = gra_cov;
@@ -311,13 +328,17 @@ class StatePredictor {
     noise_.block<3, 3>(9, 9) = V3D(pwebg, pwebg, pwebg).asDiagonal();
   }
 
-  void reset(int type = 0) {
-    if (type == 0) {
+  void reset(int type = 0)
+  {
+    if (type == 0)
+    {
       state_.rn_.setZero();
       state_.vn_ = state_.qbn_.inverse() * state_.vn_;
       state_.qbn_.setIdentity();
       initializeCovariance();
-    } else if (type == 1) {
+    }
+    else if (type == 1)
+    {
       V3D covPos = INIT_POS_STD.array().square();
       double covRoll = pow(deg2rad(INIT_ATT_STD(0)), 2);
       double covPitch = pow(deg2rad(INIT_ATT_STD(1)), 2);
@@ -334,11 +355,11 @@ class StatePredictor {
 
       covariance_.setZero();
       covariance_.block<3, 3>(GlobalState::pos_, GlobalState::pos_) =
-          covPos.asDiagonal();  // pos
+          covPos.asDiagonal(); // pos
       covariance_.block<3, 3>(GlobalState::vel_, GlobalState::vel_) =
-          state_.qbn_.inverse() * vel_cov * state_.qbn_;  // vel
+          state_.qbn_.inverse() * vel_cov * state_.qbn_; // vel
       covariance_.block<3, 3>(GlobalState::att_, GlobalState::att_) =
-          V3D(covRoll, covPitch, covYaw).asDiagonal();  // att
+          V3D(covRoll, covPitch, covYaw).asDiagonal(); // att
       covariance_.block<3, 3>(GlobalState::acc_, GlobalState::acc_) = acc_cov;
       covariance_.block<3, 3>(GlobalState::gyr_, GlobalState::gyr_) = gyr_cov;
       covariance_.block<3, 3>(GlobalState::gra_, GlobalState::gra_) =
@@ -353,7 +374,8 @@ class StatePredictor {
     }
   }
 
-  void reset(V3D vn, V3D ba, V3D bw) {
+  void reset(V3D vn, V3D ba, V3D bw)
+  {
     state_.setIdentity();
     state_.vn_ = vn;
     state_.ba_ = ba;
@@ -372,13 +394,13 @@ class StatePredictor {
   Eigen::Matrix<double, GlobalState::DIM_OF_NOISE_, GlobalState::DIM_OF_NOISE_>
       noise_;
 
-  V3D acc_last;  // last acceleration measurement
-  V3D gyr_last;  // last gyroscope measurement
+  V3D acc_last; // last acceleration measurement
+  V3D gyr_last; // last gyroscope measurement
 
   bool flag_init_state_;
   bool flag_init_imu_;
 };
 
-};  // namespace filter
+}; // namespace filter
 
-#endif  // INCLUDE_KALMANFILTER_HPP_
+#endif // INCLUDE_KALMANFILTER_HPP_

@@ -28,29 +28,34 @@ using namespace std;
 using namespace math_utils;
 using namespace parameter;
 
-namespace sensor_utils {
+namespace sensor_utils
+{
 
 // Sensor measurement class
-class Measurement {
- public:
+class Measurement
+{
+public:
   Measurement() {}
   virtual ~Measurement() {}
 };
 
-class Imu : public Measurement {
- public:
+class Imu : public Measurement
+{
+public:
   Imu() {}
-  Imu(double time, const V3D& acc, const V3D& gyr)
+  Imu(double time, const V3D &acc, const V3D &gyr)
       : time(time), acc(acc), gyr(gyr) {}
   ~Imu() {}
   double time;
-  V3D acc;  // accelerometer measurement (m^2/sec)
-  V3D gyr;  // gyroscope measurement (rad/s)
+  V3D acc; // accelerometer measurement (m^2/sec)
+  V3D gyr; // gyroscope measurement (rad/s)
 };
 
-class Gps : public Measurement {
- public:
-  Gps() {
+class Gps : public Measurement
+{
+public:
+  Gps()
+  {
     time = 0.0;
     lat = 0.0;
     lon = 0.0;
@@ -67,18 +72,21 @@ class Gps : public Measurement {
   inline V3D pn() const { return V3D(lat, lon, alt); }
 };
 
-class Odometry : public Measurement {
- public:
-  Odometry() {
+class Odometry : public Measurement
+{
+public:
+  Odometry()
+  {
     time = 0.0;
     rotation.setIdentity();
     translation.setZero();
   }
-  Odometry(double time, const Q4D& rotation, const V3D& translation)
+  Odometry(double time, const Q4D &rotation, const V3D &translation)
       : time(time), rotation(rotation), translation(translation) {}
   ~Odometry() {}
 
-  Odometry inverse(const Odometry& odom) {
+  Odometry inverse(const Odometry &odom)
+  {
     Odometry inv;
     inv.time = odom.time;
     inv.rotation = odom.rotation.inverse();
@@ -86,13 +94,15 @@ class Odometry : public Measurement {
     return inv;
   }
 
-  void boxPlus(const Odometry& increment) {
+  void boxPlus(const Odometry &increment)
+  {
     translation =
         rotation.toRotationMatrix() * increment.translation + translation;
     rotation = rotation * increment.rotation;
   }
 
-  Odometry boxMinus(const Odometry& odom) {
+  Odometry boxMinus(const Odometry &odom)
+  {
     Odometry res;
     res.translation =
         odom.rotation.inverse().toRotationMatrix() * translation -
@@ -106,31 +116,32 @@ class Odometry : public Measurement {
   V3D translation;
 };
 
-class EarthParams {
- public:
+class EarthParams
+{
+public:
   EarthParams() {}
   ~EarthParams() {}
 
-  static M3D getDrp(const V3D& pn) {
+  static M3D getDrp(const V3D &pn)
+  {
     M3D Drp = M3D::Zero();
     double latitude = pn(0);
     double longitude = pn(1);
     double height = pn(2);
     double sq = 1 - EeEe * sin(latitude) * sin(latitude);
-    double RNh = Re / sqrt(sq) + height;          // (2.5)
-    double RMh = RNh * (1 - EeEe) / sq + height;  // (2.4)
+    double RNh = Re / sqrt(sq) + height;         // (2.5)
+    double RMh = RNh * (1 - EeEe) / sq + height; // (2.4)
     Drp << 0, 1.0 / RMh, 0, 1.0 / (RNh * cos(latitude)), 0, 0, 0, 0, 1;
     return Drp;
   }
 
-  static M3D getDpr(const V3D& pn) {
+  static M3D getDpr(const V3D &pn)
+  {
     M3D Drp = getDrp(pn);
     return Drp.inverse();
   }
-
 };
 
-}  // namespace sensor_utils
+} // namespace sensor_utils
 
-#endif  // INCLUDE_SENSOR_UTILS_HPP_
-
+#endif // INCLUDE_SENSOR_UTILS_HPP_

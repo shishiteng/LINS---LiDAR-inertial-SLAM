@@ -52,21 +52,24 @@ using namespace Eigen;
 using namespace math_utils;
 using namespace sensor_utils;
 
-namespace fusion {
+namespace fusion
+{
 
-class LinsFusion {
- public:
-  LinsFusion(ros::NodeHandle& nh, ros::NodeHandle& pnh);
+class LinsFusion
+{
+public:
+  LinsFusion(ros::NodeHandle &nh, ros::NodeHandle &pnh);
   ~LinsFusion();
 
   void run();
   void initialization();
   void publishTopics();
-  void publishOdometryYZX(double timeStamp);
-  inline void publishCloudMsg(ros::Publisher& publisher,
+  void publishOdometry(double timeStamp);
+  inline void publishCloudMsg(ros::Publisher &publisher,
                               pcl::PointCloud<PointType>::Ptr cloud,
-                              const ros::Time& stamp,
-                              const std::string& frameID) {
+                              const ros::Time &stamp,
+                              const std::string &frameID)
+  {
     sensor_msgs::PointCloud2 msg;
     pcl::toROSMsg(*cloud, msg);
     msg.header.stamp = stamp;
@@ -74,27 +77,27 @@ class LinsFusion {
     publisher.publish(msg);
   }
 
-  void imuCallback(const sensor_msgs::Imu::ConstPtr& imuIn);
+  void imuCallback(const sensor_msgs::Imu::ConstPtr &imuIn);
   void laserCloudCallback(
-      const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg);
-  void laserCloudInfoCallback(const cloud_msgs::cloud_infoConstPtr& msgIn);
+      const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg);
+  void laserCloudInfoCallback(const cloud_msgs::cloud_infoConstPtr &msgIn);
   void outlierCloudCallback(
-      const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg);
-  void mapOdometryCallback(const nav_msgs::Odometry::ConstPtr& odometryMsg);
+      const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg);
+  void mapOdometryCallback(const nav_msgs::Odometry::ConstPtr &odometryMsg);
 
   void performStateEstimation();
   void processFirstPointCloud();
   bool processPointClouds();
   void performImuBiasEstimation();
-  void alignIMUtoVehicle(const V3D& rpy, const V3D& acc_in, const V3D& gyr_in,
-                         V3D& acc_out, V3D& gyr_out);
+  void alignIMUtoVehicle(const V3D &rpy, const V3D &acc_in, const V3D &gyr_in,
+                         V3D &acc_out, V3D &gyr_out);
 
- private:
+private:
   ros::NodeHandle nh_;
   ros::NodeHandle pnh_;
 
   // !@StateEstimator
-  StateEstimator* estimator;
+  StateEstimator *estimator;
 
   // !@Subscriber
   ros::Subscriber subLaserCloud;
@@ -160,6 +163,6 @@ class LinsFusion {
   bool isInititialized;
   bool isImuCalibrated;
 };
-}  // namespace fusion
+} // namespace fusion
 
-#endif  // INCLUDE_ESTIMATOR_H_
+#endif // INCLUDE_ESTIMATOR_H_

@@ -68,9 +68,3 @@ target_link_libraries(lins_fusion_node ${LINK_LIBS})
 add_executable(image_projection_node src/image_projection_node.cpp ${SOURCE_FILES})
 add_dependencies(image_projection_node ${catkin_EXPORTED_TARGETS} cloud_msgs_gencpp)
 target_link_libraries(image_projection_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
-
-add_executable(lidar_mapping_node src/lidar_mapping_node.cpp ${SOURCE_FILES})
-target_link_libraries(lidar_mapping_node ${LINK_LIBS} gtsam)
-
-add_executable(transform_fusion_node src/transform_fusion_node.cpp ${SOURCE_FILES})
-target_link_libraries(transform_fusion_node ${LINK_LIBS})

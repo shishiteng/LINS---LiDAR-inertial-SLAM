@@ -49,13 +49,16 @@ using namespace sensor_utils;
 using namespace parameter;
 using namespace filter;
 
-namespace fusion {
+namespace fusion
+{
 
 const int LINE_NUM_ = 16;
 const int SCAN_NUM_ = 1800;
 
-struct Smooth {
-  Smooth() {
+struct Smooth
+{
+  Smooth()
+  {
     value = 0.0;
     ind = 0;
   }
@@ -63,19 +66,23 @@ struct Smooth {
   size_t ind;
 };
 
-struct byValue {
-  bool operator()(Smooth const& left, Smooth const& right) {
+struct byValue
+{
+  bool operator()(Smooth const &left, Smooth const &right)
+  {
     return left.value < right.value;
   }
 };
 
 // Scan Class stores all kinds of information of a point cloud, including
 // the whole point cloud, its smoothness, timestamp, and features.
-class Scan {
- public:
+class Scan
+{
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  Scan() : id_(scan_counter_++) {
+  Scan() : id_(scan_counter_++)
+  {
     distPointCloud_.reset(new pcl::PointCloud<PointType>());
     undistPointCloud_.reset(new pcl::PointCloud<PointType>());
     outlierPointCloud_.reset(new pcl::PointCloud<PointType>());
@@ -85,17 +92,14 @@ class Scan {
     surfPointsLessFlat_.reset(new pcl::PointCloud<PointType>());
     cloudInfo_.reset(new cloud_msgs::cloud_info());
 
-    cornerPointsLessSharpYZX_.reset(new pcl::PointCloud<PointType>());
-    surfPointsLessFlatYZX_.reset(new pcl::PointCloud<PointType>());
-    outlierPointCloudYZX_.reset(new pcl::PointCloud<PointType>());
-
     cloudCurvature_.resize(LINE_NUM * SCAN_NUM);
     cloudSmoothness_.resize(LINE_NUM * SCAN_NUM);
 
     reset();
   }
 
-  ~Scan() {
+  ~Scan()
+  {
     distPointCloud_.reset();
     undistPointCloud_.reset();
     outlierPointCloud_.reset();
@@ -104,13 +108,10 @@ class Scan {
     surfPointsFlat_.reset();
     surfPointsLessFlat_.reset();
     cloudInfo_.reset();
-
-    cornerPointsLessSharpYZX_.reset();
-    surfPointsLessFlatYZX_.reset();
-    outlierPointCloudYZX_.reset();
   }
 
-  void reset() {
+  void reset()
+  {
     time_ = 0.0;
 
     distPointCloud_->clear();
@@ -121,10 +122,6 @@ class Scan {
     surfPointsFlat_->clear();
     surfPointsLessFlat_->clear();
 
-    cornerPointsLessSharpYZX_->clear();
-    surfPointsLessFlatYZX_->clear();
-    outlierPointCloudYZX_->clear();
-
     cloudCurvature_.assign(LINE_NUM * SCAN_NUM, 0.0);
     cloudSmoothness_.assign(LINE_NUM * SCAN_NUM, Smooth());
   }
@@ -132,14 +129,15 @@ class Scan {
   void setPointCloud(double time,
                      pcl::PointCloud<PointType>::Ptr distPointCloud,
                      cloud_msgs::cloud_info cloudInfo,
-                     pcl::PointCloud<PointType>::Ptr outlierPointCloud) {
+                     pcl::PointCloud<PointType>::Ptr outlierPointCloud)
+  {
     distPointCloud_ = distPointCloud;
     *(cloudInfo_) = cloudInfo;
     outlierPointCloud_ = outlierPointCloud;
     time_ = time;
   }
 
- public:
+public:
   // !@ScanInfo
   static int scan_counter_;
   int id_;
@@ -162,19 +160,17 @@ class Scan {
   pcl::PointCloud<PointType>::Ptr cornerPointsLessSharp_;
   pcl::PointCloud<PointType>::Ptr surfPointsFlat_;
   pcl::PointCloud<PointType>::Ptr surfPointsLessFlat_;
-
-  pcl::PointCloud<PointType>::Ptr cornerPointsLessSharpYZX_;
-  pcl::PointCloud<PointType>::Ptr surfPointsLessFlatYZX_;
-  pcl::PointCloud<PointType>::Ptr outlierPointCloudYZX_;
 };
-typedef shared_ptr<Scan> ScanPtr;  // Define a pointer class for Scan class
+typedef shared_ptr<Scan> ScanPtr; // Define a pointer class for Scan class
 
 // StateEstimator Class implement a iterative-ESKF, including state propagation
 // and update.
-class StateEstimator {
- public:
+class StateEstimator
+{
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  enum FusionStatus {
+  enum FusionStatus
+  {
     STATUS_INIT = 0,
     STATUS_FIRST_SCAN = 1,
     STATUS_SECOND_SCAN = 2,
@@ -182,7 +178,8 @@ class StateEstimator {
     STATUS_RESET = 4,
   };
 
-  StateEstimator() {
+  StateEstimator()
+  {
     filter_ = new StatePredictor();
 
     // Initialize KD tree and downsize filter
@@ -211,20 +208,14 @@ class StateEstimator {
     pointSearchSurfInd3.resize(LINE_NUM * SCAN_NUM);
 
     globalState_.setIdentity();
-    globalStateYZX_.setIdentity();
-
-    // Rotation matrics between XYZ convention and YZX-convention
-    R_yzx_to_xyz << 0., 0., 1., 1., 0., 0., 0., 1., 0.;
-    R_xyz_to_yzx = R_yzx_to_xyz.transpose();
-    Q_yzx_to_xyz = R_yzx_to_xyz;
-    Q_xyz_to_yzx = R_xyz_to_yzx;
 
     // gravity_feedback << 0, 0, -G0;
 
     status_ = STATUS_INIT;
   }
 
-  ~StateEstimator() {
+  ~StateEstimator()
+  {
     delete filter_;
     delete preintegration_;
   }
@@ -239,21 +230,23 @@ class StateEstimator {
   V3D acc_0_;
   V3D gyr_0_;
   /***********************************/
-  void processImu(double dt, const V3D& acc, const V3D& gyr) {
-    switch (status_) {
-      case STATUS_INIT:
-        break;
-      case STATUS_FIRST_SCAN:
-        preintegration_->push_back(dt, acc, gyr);
-        filter_->time_ += dt;
-        acc_0_ = acc;
-        gyr_0_ = gyr;
-        break;
-      case STATUS_RUNNING:
-        filter_->predict(dt, acc, gyr, true);
-        break;
-      default:
-        break;
+  void processImu(double dt, const V3D &acc, const V3D &gyr)
+  {
+    switch (status_)
+    {
+    case STATUS_INIT:
+      break;
+    case STATUS_FIRST_SCAN:
+      preintegration_->push_back(dt, acc, gyr);
+      filter_->time_ += dt;
+      acc_0_ = acc;
+      gyr_0_ = gyr;
+      break;
+    case STATUS_RUNNING:
+      filter_->predict(dt, acc, gyr, true);
+      break;
+    default:
+      break;
     }
 
     // For no use here. Just propagte IMU measurements for testing
@@ -276,13 +269,13 @@ class StateEstimator {
   double num_of_surf_ = 0;
   int lidar_counter_ = 0;
   /***********************************/
-  void processPCL(double time, const Imu& imu,
+  void processPCL(double time, const Imu &imu,
                   pcl::PointCloud<PointType>::Ptr distortedPointCloud,
                   cloud_msgs::cloud_info cloudInfo,
-                  pcl::PointCloud<PointType>::Ptr outlierPointCloud) {
-    TicToc ts_fea;  // Calculate the time used in feature extraction
-    scan_new_->setPointCloud(time, distortedPointCloud, cloudInfo,
-                             outlierPointCloud);
+                  pcl::PointCloud<PointType>::Ptr outlierPointCloud)
+  {
+    TicToc ts_fea; // Calculate the time used in feature extraction
+    scan_new_->setPointCloud(time, distortedPointCloud, cloudInfo, outlierPointCloud);
     undistortPcl(scan_new_);
     calculateSmoothness(scan_new_);
     markOccludedPoints(scan_new_);
@@ -290,20 +283,23 @@ class StateEstimator {
     imu_last_ = imu;
     double time_fea = ts_fea.toc();
 
-    TicToc ts_opt;  // Calculate the time used in state estimation
-    switch (status_) {
-      case STATUS_INIT:
-        if (processFirstScan()) status_ = STATUS_FIRST_SCAN;
-        break;
-      case STATUS_FIRST_SCAN:
-        if (processSecondScan())
-          status_ = STATUS_RUNNING;
-        else
-          status_ = STATUS_INIT;
-        break;
-      case STATUS_RUNNING:
-        if (!processScan()) status_ = STATUS_RUNNING;
-        break;
+    TicToc ts_opt; // Calculate the time used in state estimation
+    switch (status_)
+    {
+    case STATUS_INIT:
+      if (processFirstScan())
+        status_ = STATUS_FIRST_SCAN;
+      break;
+    case STATUS_FIRST_SCAN:
+      if (processSecondScan())
+        status_ = STATUS_RUNNING;
+      else
+        status_ = STATUS_INIT;
+      break;
+    case STATUS_RUNNING:
+      if (!processScan())
+        status_ = STATUS_RUNNING;
+      break;
     }
     double time_opt = ts_opt.toc();
 
@@ -312,11 +308,9 @@ class StateEstimator {
     //       (duration_fea_ * lidar_counter_ + time_fea) / (lidar_counter_ + 1);
     //   duration_opt_ =
     //       (duration_opt_ * lidar_counter_ + time_opt) / (lidar_counter_ + 1);
-    //   num_of_edge_ = (num_of_edge_ * lidar_counter_ +
-    //                   scan_last_->cornerPointsLessSharpYZX_->points.size()) /
+    //   num_of_edge_ = (num_of_edge_ * lidar_counter_) /
     //                  (lidar_counter_ + 1);
-    //   num_of_surf_ = (num_of_surf_ * lidar_counter_ +
-    //                   scan_last_->surfPointsLessFlatYZX_->points.size()) /
+    //   num_of_surf_ = (num_of_surf_ * lidar_counter_) /
     //                  (lidar_counter_ + 1);
     //   lidar_counter_++;
 
@@ -328,9 +322,11 @@ class StateEstimator {
   }
 
   // Initialize the Kalman filter and KD tree
-  bool processFirstScan() {
+  bool processFirstScan()
+  {
     if (scan_new_->cornerPointsLessSharp_->points.size() < 10 ||
-        scan_new_->surfPointsLessFlat_->points.size() < 100) {
+        scan_new_->surfPointsLessFlat_->points.size() < 100)
+    {
       ROS_WARN("Wait for more features for initialization...");
       scan_new_.reset(new Scan());
       return false;
@@ -352,8 +348,7 @@ class StateEstimator {
     linState_.setIdentity();
 
     // Initialize IMU preintegration variable
-    preintegration_ = new integration::IntegrationBase(
-        imu_last_.acc, imu_last_.gyr, INIT_BA, INIT_BW);
+    preintegration_ = new integration::IntegrationBase(imu_last_.acc, imu_last_.gyr, INIT_BA, INIT_BW);
 
     // Initialize position, velocity, acceleration bias, gyroscope bias by zeros
     filter_->initialization(scan_new_->time_, V3D(0, 0, 0), V3D(0, 0, 0),
@@ -376,9 +371,11 @@ class StateEstimator {
 
   // Calculate initial velocity and IMU biases using two consecutive frames and
   // IMU preintegration results
-  bool processSecondScan() {
+  bool processSecondScan()
+  {
     if (scan_new_->cornerPointsLessSharp_->points.size() < 10 ||
-        scan_new_->surfPointsLessFlat_->points.size() < 100) {
+        scan_new_->surfPointsLessFlat_->points.size() < 100)
+    {
       ROS_WARN("Wait for more features for initialization...");
       scan_new_.reset(new Scan());
       return false;
@@ -391,8 +388,7 @@ class StateEstimator {
     ba0.setZero();
     ql = preintegration_->delta_q;
     pl = preintegration_->delta_p +
-         0.5 * linState_.gn_ * preintegration_->sum_dt *
-             preintegration_->sum_dt -
+         0.5 * linState_.gn_ * preintegration_->sum_dt * preintegration_->sum_dt -
          0.5 * ba0 * preintegration_->sum_dt * preintegration_->sum_dt;
     estimateTransform(scan_last_, scan_new_, pl, ql);
 
@@ -424,17 +420,20 @@ class StateEstimator {
     return true;
   }
 
-  void correctRollPitch(const double& roll, const double& pitch) {
+  void correctRollPitch(const double &roll, const double &pitch)
+  {
     V3D rpy = math_utils::Q2rpy(globalState_.qbn_);
     Q4D quad = math_utils::rpy2Quat(V3D(roll, pitch, rpy[2]));
     globalState_.qbn_ = quad;
   }
 
-  void correctOrientation(const Q4D& quad) { globalState_.qbn_ = quad; }
+  void correctOrientation(const Q4D &quad) { globalState_.qbn_ = quad; }
 
-  bool processScan() {
+  bool processScan()
+  {
     if (scan_new_->cornerPointsLessSharp_->points.size() <= 5 ||
-        scan_new_->surfPointsLessFlat_->points.size() <= 10) {
+        scan_new_->surfPointsLessFlat_->points.size() <= 10)
+    {
       ROS_WARN("Insufficient features...State estimation fails.");
       return false;
     }
@@ -462,7 +461,8 @@ class StateEstimator {
     return true;
   }
 
-  void performIESKF() {
+  void performIESKF()
+  {
     // Store current state and perform initialization
     Pk_ = filter_->covariance_;
     GlobalState filterState = filter_->state_;
@@ -473,24 +473,27 @@ class StateEstimator {
     bool hasDiverged = false;
     const unsigned int DIM_OF_STATE = GlobalState::DIM_OF_STATE_;
     for (int iter = 0; iter < NUM_ITER && !hasConverged && !hasDiverged;
-         iter++) {
+         iter++)
+    {
       keypointSurfs_->clear();
       jacobianCoffSurfs->clear();
       keypointCorns_->clear();
       jacobianCoffCorns->clear();
 
       // Find corresponding features
-      findCorrespondingSurfFeatures(scan_last_, scan_new_, keypointSurfs_,
-                                    jacobianCoffSurfs, iter);
-      if (keypointSurfs_->points.size() < 10) {
-        if (VERBOSE) {
+      findCorrespondingSurfFeatures(scan_last_, scan_new_, keypointSurfs_, jacobianCoffSurfs, iter);
+      if (keypointSurfs_->points.size() < 10)
+      {
+        if (VERBOSE)
+        {
           ROS_WARN("Insufficient matched surfs...");
         }
       }
-      findCorrespondingCornerFeatures(scan_last_, scan_new_, keypointCorns_,
-                                      jacobianCoffCorns, iter);
-      if (keypointCorns_->points.size() < 5) {
-        if (VERBOSE) {
+      findCorrespondingCornerFeatures(scan_last_, scan_new_, keypointCorns_, jacobianCoffCorns, iter);
+      if (keypointCorns_->points.size() < 5)
+      {
+        if (VERBOSE)
+        {
           ROS_WARN("Insufficient matched corners...");
         }
       }
@@ -514,7 +517,8 @@ class StateEstimator {
 
       Hk_.setZero();
       V3D axis = Quat2axis(linState_.qbn_);
-      for (int i = 0; i < DIM_OF_MEAS; ++i) {
+      for (int i = 0; i < DIM_OF_MEAS; ++i)
+      {
         // Point represented in 2-frame (e.g., the end frame) in a
         // xyz-convention
         V3D P2xyz(keypoints_->points[i].x, keypoints_->points[i].y,
@@ -533,37 +537,42 @@ class StateEstimator {
 
       // Set the measurement covariance matrix
       VXD cov = VXD::Zero(DIM_OF_MEAS);
-      for (int i = 0; i < DIM_OF_MEAS; ++i) {
+      for (int i = 0; i < DIM_OF_MEAS; ++i)
+      {
         cov[i] = LIDAR_STD * LIDAR_STD;
       }
       Rk_ = cov.asDiagonal();
 
       // Kalman filter update. Details can be referred to ROVIO
       Py_ =
-          Hk_ * Pk_ * Hk_.transpose() + Rk_;  // S = H * P * H.transpose() + R;
-      Pyinv_.setIdentity();                   // solve Ax=B
+          Hk_ * Pk_ * Hk_.transpose() + Rk_; // S = H * P * H.transpose() + R;
+      Pyinv_.setIdentity();                  // solve Ax=B
       Py_.llt().solveInPlace(Pyinv_);
-      Kk_ = Pk_ * Hk_.transpose() * Pyinv_;  // K = P*H.transpose()*S.inverse()
+      Kk_ = Pk_ * Hk_.transpose() * Pyinv_; // K = P*H.transpose()*S.inverse()
 
       filterState.boxMinus(linState_, difVecLinInv_);
       updateVec_ = -Kk_ * (residual_ + Hk_ * difVecLinInv_) + difVecLinInv_;
 
       // Divergence determination
       bool hasNaN = false;
-      for (int i = 0; i < updateVec_.size(); i++) {
-        if (isnan(updateVec_[i])) {
+      for (int i = 0; i < updateVec_.size(); i++)
+      {
+        if (isnan(updateVec_[i]))
+        {
           updateVec_[i] = 0;
           hasNaN = true;
         }
       }
-      if (hasNaN == true) {
+      if (hasNaN == true)
+      {
         ROS_WARN("System diverges Because of NaN...");
         hasDiverged = true;
         break;
       }
 
       // Check whether the filter converges
-      if (residual_.norm() > residualNorm * 10) {
+      if (residual_.norm() > residualNorm * 10)
+      {
         ROS_WARN("System diverges...");
         hasDiverged = true;
         break;
@@ -573,7 +582,8 @@ class StateEstimator {
       linState_.boxPlus(updateVec_, linState_);
 
       updateVecNorm_ = updateVec_.norm();
-      if (updateVecNorm_ <= 1e-2) {
+      if (updateVecNorm_ <= 1e-2)
+      {
         hasConverged = true;
       }
 
@@ -582,7 +592,8 @@ class StateEstimator {
 
     // If diverges, swtich to traditional ICP method to get a rough relative
     // transformation. Otherwise, update the error-state covariance matrix
-    if (hasDiverged == true) {
+    if (hasDiverged == true)
+    {
       ROS_WARN("======Using ICP Method======");
       V3D t = filterState.rn_;
       Q4D q = filterState.qbn_;
@@ -590,7 +601,9 @@ class StateEstimator {
       filterState.rn_ = t;
       filterState.qbn_ = q;
       filter_->update(filterState, Pk_);
-    } else {
+    }
+    else
+    {
       // Update only one time
       IKH_ = Eigen::Matrix<double, 18, 18>::Identity() - Kk_ * Hk_;
       Pk_ = IKH_ * Pk_ * IKH_.transpose() + Kk_ * Rk_ * Kk_.transpose();
@@ -599,13 +612,15 @@ class StateEstimator {
     }
   }
 
-  void calculateRPfromGravity(const V3D& fbib, double& roll, double& pitch) {
+  void calculateRPfromGravity(const V3D &fbib, double &roll, double &pitch)
+  {
     pitch = -sign(fbib.z()) * asin(fbib.x() / G0);
     roll = sign(fbib.z()) * asin(fbib.y() / G0);
   }
 
   // Update the gloabl state by the new relative transformation
-  void integrateTransformation() {
+  void integrateTransformation()
+  {
     GlobalState filterState = filter_->state_;
     globalState_.rn_ = globalState_.qbn_ * filterState.rn_ + globalState_.rn_;
     globalState_.qbn_ = globalState_.qbn_ * filterState.qbn_;
@@ -616,27 +631,33 @@ class StateEstimator {
     globalState_.gn_ = globalState_.qbn_ * filterState.gn_;
   }
 
-  void undistortPcl(ScanPtr scan) {
+  void undistortPcl(ScanPtr scan)
+  {
     bool halfPassed = false;
     scan->undistPointCloud_->clear();
     pcl::PointCloud<PointType>::Ptr distPointCloud = scan->distPointCloud_;
     cloud_msgs::cloud_info::Ptr segInfo = scan->cloudInfo_;
     int size = distPointCloud->points.size();
     PointType point;
-    for (int i = 0; i < size; i++) {
+    for (int i = 0; i < size; i++)
+    {
       // If LiDAR frame does not align with Vehic frame, we transform the point
       // cloud to the vehicle frame
       rotatePoint(&distPointCloud->points[i], &point);
 
       double ori = -atan2(point.y, point.x);
-      if (!halfPassed) {
+      if (!halfPassed)
+      {
         if (ori < segInfo->startOrientation - M_PI / 2)
           ori += 2 * M_PI;
         else if (ori > segInfo->startOrientation + M_PI * 3 / 2)
           ori -= 2 * M_PI;
 
-        if (ori - segInfo->startOrientation > M_PI) halfPassed = true;
-      } else {
+        if (ori - segInfo->startOrientation > M_PI)
+          halfPassed = true;
+      }
+      else
+      {
         ori += 2 * M_PI;
 
         if (ori < segInfo->endOrientation - M_PI * 3 / 2)
@@ -653,10 +674,12 @@ class StateEstimator {
     }
   }
 
-  void calculateSmoothness(ScanPtr scan) {
+  void calculateSmoothness(ScanPtr scan)
+  {
     int cloudSize = scan->undistPointCloud_->points.size();
     cloud_msgs::cloud_info::Ptr segInfo = scan->cloudInfo_;
-    for (int i = 5; i < cloudSize - 5; i++) {
+    for (int i = 5; i < cloudSize - 5; i++)
+    {
       double diffRange = segInfo->segmentedCloudRange[i - 5] +
                          segInfo->segmentedCloudRange[i - 4] +
                          segInfo->segmentedCloudRange[i - 3] +
@@ -677,23 +700,29 @@ class StateEstimator {
     }
   }
 
-  void markOccludedPoints(ScanPtr scan) {
+  void markOccludedPoints(ScanPtr scan)
+  {
     int cloudSize = scan->undistPointCloud_->points.size();
     cloud_msgs::cloud_info::Ptr segInfo = scan->cloudInfo_;
-    for (int i = 5; i < cloudSize - 6; ++i) {
+    for (int i = 5; i < cloudSize - 6; ++i)
+    {
       float depth1 = segInfo->segmentedCloudRange[i];
       float depth2 = segInfo->segmentedCloudRange[i + 1];
       int columnDiff = std::abs(int(segInfo->segmentedCloudColInd[i + 1] -
                                     segInfo->segmentedCloudColInd[i]));
-      if (columnDiff < 10) {
-        if (depth1 - depth2 > 0.3) {
+      if (columnDiff < 10)
+      {
+        if (depth1 - depth2 > 0.3)
+        {
           scan->cloudNeighborPicked_[i - 5] = 1;
           scan->cloudNeighborPicked_[i - 4] = 1;
           scan->cloudNeighborPicked_[i - 3] = 1;
           scan->cloudNeighborPicked_[i - 2] = 1;
           scan->cloudNeighborPicked_[i - 1] = 1;
           scan->cloudNeighborPicked_[i] = 1;
-        } else if (depth2 - depth1 > 0.3) {
+        }
+        else if (depth2 - depth1 > 0.3)
+        {
           scan->cloudNeighborPicked_[i + 1] = 1;
           scan->cloudNeighborPicked_[i + 2] = 1;
           scan->cloudNeighborPicked_[i + 3] = 1;
@@ -716,7 +745,8 @@ class StateEstimator {
   pcl::PointCloud<PointType>::Ptr surfPointsLessFlatScan;
   pcl::PointCloud<PointType>::Ptr surfPointsLessFlatScanDS;
   /***********************************/
-  void extractFeatures(ScanPtr scan) {
+  void extractFeatures(ScanPtr scan)
+  {
     cloud_msgs::cloud_info::Ptr segInfo = scan->cloudInfo_;
 
     scan->cornerPointsSharp_->clear();
@@ -724,96 +754,121 @@ class StateEstimator {
     scan->surfPointsFlat_->clear();
     scan->surfPointsLessFlat_->clear();
 
-    for (int i = 0; i < LINE_NUM; i++) {
+    for (int i = 0; i < LINE_NUM; i++)
+    {
       surfPointsLessFlatScan->clear();
 
-      for (int j = 0; j < 6; j++) {
+      for (int j = 0; j < 6; j++)
+      {
         int sp = (segInfo->startRingIndex[i] * (6 - j) +
-                  segInfo->endRingIndex[i] * j) / 6;
+                  segInfo->endRingIndex[i] * j) /
+                 6;
         int ep = (segInfo->startRingIndex[i] * (5 - j) +
                   segInfo->endRingIndex[i] * (j + 1)) /
-                     6 - 1;
+                     6 -
+                 1;
 
-        if (sp >= ep) continue;
+        if (sp >= ep)
+          continue;
 
         std::sort(scan->cloudSmoothness_.begin() + sp,
                   scan->cloudSmoothness_.begin() + ep, byValue());
 
         int largestPickedNum = 0;
-        for (int k = ep; k >= sp; k--) {
+        for (int k = ep; k >= sp; k--)
+        {
           int ind = scan->cloudSmoothness_[k].ind;
           if (scan->cloudNeighborPicked_[ind] == 0 &&
               scan->cloudCurvature_[ind] > EDGE_THRESHOLD &&
-              segInfo->segmentedCloudGroundFlag[ind] == false) {
+              segInfo->segmentedCloudGroundFlag[ind] == false)
+          {
             largestPickedNum++;
-            if (largestPickedNum <= 2) {
+            if (largestPickedNum <= 2)
+            {
               scan->cloudLabel_[ind] = 2;
               scan->cornerPointsSharp_->push_back(
                   scan->undistPointCloud_->points[ind]);
               scan->cornerPointsLessSharp_->push_back(
                   scan->undistPointCloud_->points[ind]);
-            } else if (largestPickedNum <= 20) {
+            }
+            else if (largestPickedNum <= 20)
+            {
               scan->cloudLabel_[ind] = 1;
               scan->cornerPointsLessSharp_->push_back(
                   scan->undistPointCloud_->points[ind]);
-            } else {
+            }
+            else
+            {
               break;
             }
 
             scan->cloudNeighborPicked_[ind] = 1;
-            for (int l = 1; l <= 5; l++) {
+            for (int l = 1; l <= 5; l++)
+            {
               int columnDiff =
                   std::abs(int(segInfo->segmentedCloudColInd[ind + l] -
                                segInfo->segmentedCloudColInd[ind + l - 1]));
-              if (columnDiff > 10) break;
+              if (columnDiff > 10)
+                break;
               scan->cloudNeighborPicked_[ind + l] = 1;
             }
-            for (int l = -1; l >= -5; l--) {
+            for (int l = -1; l >= -5; l--)
+            {
               int columnDiff =
                   std::abs(int(segInfo->segmentedCloudColInd[ind + l] -
                                segInfo->segmentedCloudColInd[ind + l + 1]));
-              if (columnDiff > 10) break;
+              if (columnDiff > 10)
+                break;
               scan->cloudNeighborPicked_[ind + l] = 1;
             }
           }
         }
 
         int smallestPickedNum = 0;
-        for (int k = sp; k <= ep; k++) {
+        for (int k = sp; k <= ep; k++)
+        {
           int ind = scan->cloudSmoothness_[k].ind;
           if (scan->cloudNeighborPicked_[ind] == 0 &&
               scan->cloudCurvature_[ind] < SURF_THRESHOLD &&
-              segInfo->segmentedCloudGroundFlag[ind] == true) {
+              segInfo->segmentedCloudGroundFlag[ind] == true)
+          {
             scan->cloudLabel_[ind] = -1;
             scan->surfPointsFlat_->push_back(
                 scan->undistPointCloud_->points[ind]);
             smallestPickedNum++;
-            if (smallestPickedNum >= 4) {
+            if (smallestPickedNum >= 4)
+            {
               break;
             }
 
             scan->cloudNeighborPicked_[ind] = 1;
-            for (int l = 1; l <= 5; l++) {
+            for (int l = 1; l <= 5; l++)
+            {
               int columnDiff =
                   std::abs(int(segInfo->segmentedCloudColInd[ind + l] -
                                segInfo->segmentedCloudColInd[ind + l - 1]));
-              if (columnDiff > 10) break;
+              if (columnDiff > 10)
+                break;
 
               scan->cloudNeighborPicked_[ind + l] = 1;
             }
-            for (int l = -1; l >= -5; l--) {
+            for (int l = -1; l >= -5; l--)
+            {
               int columnDiff =
                   std::abs(int(segInfo->segmentedCloudColInd[ind + l] -
                                segInfo->segmentedCloudColInd[ind + l + 1]));
-              if (columnDiff > 10) break;
+              if (columnDiff > 10)
+                break;
 
               scan->cloudNeighborPicked_[ind + l] = 1;
             }
           }
         }
 
-        for (int k = sp; k <= ep; k++) {
-          if (scan->cloudLabel_[k] <= 0) {
+        for (int k = sp; k <= ep; k++)
+        {
+          if (scan->cloudLabel_[k] <= 0)
+          {
             surfPointsLessFlatScan->push_back(
                 scan->undistPointCloud_->points[k]);
           }
@@ -829,38 +884,38 @@ class StateEstimator {
   void findCorrespondingSurfFeatures(
       ScanPtr lastScan, ScanPtr newScan,
       pcl::PointCloud<PointType>::Ptr keypoints,
-      pcl::PointCloud<PointType>::Ptr jacobianCoff, int iterCount) {
+      pcl::PointCloud<PointType>::Ptr jacobianCoff, int iterCount)
+  {
     int surfPointsFlatNum = newScan->surfPointsFlat_->points.size();
 
-    for (int i = 0; i < surfPointsFlatNum; i++) {
+    for (int i = 0; i < surfPointsFlatNum; i++)
+    {
       PointType pointSel;
       PointType coeff, tripod1, tripod2, tripod3;
 
       transformToStart(&newScan->surfPointsFlat_->points[i], &pointSel);
 
-      pcl::PointCloud<PointType>::Ptr laserCloudSurfLast =
-          lastScan->surfPointsLessFlat_;
+      pcl::PointCloud<PointType>::Ptr laserCloudSurfLast = lastScan->surfPointsLessFlat_;
 
-      if (iterCount % ICP_FREQ == 0) {
+      if (iterCount % ICP_FREQ == 0)
+      {
         std::vector<int> pointSearchInd;
         std::vector<float> pointSearchSqDis;
-        kdtreeSurf_->nearestKSearch(pointSel, 1, pointSearchInd,
-                                    pointSearchSqDis);
+        kdtreeSurf_->nearestKSearch(pointSel, 1, pointSearchInd, pointSearchSqDis);
         int closestPointInd = -1, minPointInd2 = -1, minPointInd3 = -1;
 
-        if (pointSearchSqDis[0] < NEAREST_FEATURE_SEARCH_SQ_DIST) {
+        if (pointSearchSqDis[0] < NEAREST_FEATURE_SEARCH_SQ_DIST)
+        {
           closestPointInd = pointSearchInd[0];
-          int closestPointScan =
-              int(laserCloudSurfLast->points[closestPointInd].intensity);
+          int closestPointScan = int(laserCloudSurfLast->points[closestPointInd].intensity);
 
           float pointSqDis, minPointSqDis2 = NEAREST_FEATURE_SEARCH_SQ_DIST,
                             minPointSqDis3 = NEAREST_FEATURE_SEARCH_SQ_DIST;
 
-          for (int j = closestPointInd + 1; j < surfPointsFlatNum; j++) {
-            if (int(laserCloudSurfLast->points[j].intensity) >
-                closestPointScan + 2.5) {
+          for (int j = closestPointInd + 1; j < surfPointsFlatNum; j++)
+          {
+            if (int(laserCloudSurfLast->points[j].intensity) > closestPointScan + 2.5)
               break;
-            }
 
             pointSqDis = (laserCloudSurfLast->points[j].x - pointSel.x) *
                              (laserCloudSurfLast->points[j].x - pointSel.x) +
@@ -868,23 +923,29 @@ class StateEstimator {
                              (laserCloudSurfLast->points[j].y - pointSel.y) +
                          (laserCloudSurfLast->points[j].z - pointSel.z) *
                              (laserCloudSurfLast->points[j].z - pointSel.z);
-            if (int(laserCloudSurfLast->points[j].intensity) <=
-                closestPointScan) {
-              if (pointSqDis < minPointSqDis2) {
+            if (int(laserCloudSurfLast->points[j].intensity) <= closestPointScan)
+            {
+              if (pointSqDis < minPointSqDis2)
+              {
                 minPointSqDis2 = pointSqDis;
                 minPointInd2 = j;
               }
-            } else {
-              if (pointSqDis < minPointSqDis3) {
+            }
+            else
+            {
+              if (pointSqDis < minPointSqDis3)
+              {
                 minPointSqDis3 = pointSqDis;
                 minPointInd3 = j;
               }
             }
           }
 
-          for (int j = closestPointInd - 1; j >= 0; j--) {
+          for (int j = closestPointInd - 1; j >= 0; j--)
+          {
             if (int(laserCloudSurfLast->points[j].intensity) <
-                closestPointScan - 2.5) {
+                closestPointScan - 2.5)
+            {
               break;
             }
 
@@ -895,14 +956,18 @@ class StateEstimator {
                          (laserCloudSurfLast->points[j].z - pointSel.z) *
                              (laserCloudSurfLast->points[j].z - pointSel.z);
 
-            if (int(laserCloudSurfLast->points[j].intensity) >=
-                closestPointScan) {
-              if (pointSqDis < minPointSqDis2) {
+            if (int(laserCloudSurfLast->points[j].intensity) >= closestPointScan)
+            {
+              if (pointSqDis < minPointSqDis2)
+              {
                 minPointSqDis2 = pointSqDis;
                 minPointInd2 = j;
               }
-            } else {
-              if (pointSqDis < minPointSqDis3) {
+            }
+            else
+            {
+              if (pointSqDis < minPointSqDis3)
+              {
                 minPointSqDis3 = pointSqDis;
                 minPointInd3 = j;
               }
@@ -914,7 +979,8 @@ class StateEstimator {
         pointSearchSurfInd3[i] = minPointInd3;
       }
 
-      if (pointSearchSurfInd2[i] >= 0 && pointSearchSurfInd3[i] >= 0) {
+      if (pointSearchSurfInd2[i] >= 0 && pointSearchSurfInd3[i] >= 0)
+      {
         tripod1 = laserCloudSurfLast->points[pointSearchSurfInd1[i]];
         tripod2 = laserCloudSurfLast->points[pointSearchSurfInd2[i]];
         tripod3 = laserCloudSurfLast->points[pointSearchSurfInd3[i]];
@@ -932,14 +998,14 @@ class StateEstimator {
         V3D jacxyz = M.transpose() / (m);
 
         float s = 1;
-        if (iterCount >= ICP_FREQ) {
-          s = 1 -
-              1.8 * fabs(res) /
-                  sqrt(sqrt(pointSel.x * pointSel.x + pointSel.y * pointSel.y +
-                            pointSel.z * pointSel.z));
+        if (iterCount >= ICP_FREQ)
+        {
+          s = 1 - 1.8 * fabs(res) /
+                      sqrt(sqrt(pointSel.x * pointSel.x + pointSel.y * pointSel.y + pointSel.z * pointSel.z));
         }
 
-        if (s > 0.1 && res != 0) {
+        if (s > 0.1 && res != 0)
+        {
           coeff.x = s * jacxyz(0);
           coeff.y = s * jacxyz(1);
           coeff.z = s * jacxyz(2);
@@ -955,10 +1021,12 @@ class StateEstimator {
   void findCorrespondingCornerFeatures(
       ScanPtr lastScan, ScanPtr newScan,
       pcl::PointCloud<PointType>::Ptr keypoints,
-      pcl::PointCloud<PointType>::Ptr jacobianCoff, int iterCount) {
+      pcl::PointCloud<PointType>::Ptr jacobianCoff, int iterCount)
+  {
     int cornerPointsSharpNum = newScan->cornerPointsSharp_->points.size();
 
-    for (int i = 0; i < cornerPointsSharpNum; i++) {
+    for (int i = 0; i < cornerPointsSharpNum; i++)
+    {
       PointType pointSel;
       PointType coeff, tripod1, tripod2;
 
@@ -967,24 +1035,24 @@ class StateEstimator {
       pcl::PointCloud<PointType>::Ptr laserCloudCornerLast =
           lastScan->cornerPointsLessSharp_;
 
-      if (iterCount % ICP_FREQ == 0) {
+      if (iterCount % ICP_FREQ == 0)
+      {
         std::vector<int> pointSearchInd;
         std::vector<float> pointSearchSqDis;
         kdtreeCorner_->nearestKSearch(pointSel, 1, pointSearchInd,
                                       pointSearchSqDis);
         int closestPointInd = -1, minPointInd2 = -1;
 
-        if (pointSearchSqDis[0] < NEAREST_FEATURE_SEARCH_SQ_DIST) {
+        if (pointSearchSqDis[0] < NEAREST_FEATURE_SEARCH_SQ_DIST)
+        {
           closestPointInd = pointSearchInd[0];
-          int closestPointScan =
-              int(laserCloudCornerLast->points[closestPointInd].intensity);
+          int closestPointScan = int(laserCloudCornerLast->points[closestPointInd].intensity);
 
           float pointSqDis, minPointSqDis2 = NEAREST_FEATURE_SEARCH_SQ_DIST;
-          for (int j = closestPointInd + 1; j < cornerPointsSharpNum; j++) {
-            if (int(laserCloudCornerLast->points[j].intensity) >
-                closestPointScan + 2.5) {
+          for (int j = closestPointInd + 1; j < cornerPointsSharpNum; j++)
+          {
+            if (int(laserCloudCornerLast->points[j].intensity) > closestPointScan + 2.5)
               break;
-            }
 
             pointSqDis = (laserCloudCornerLast->points[j].x - pointSel.x) *
                              (laserCloudCornerLast->points[j].x - pointSel.x) +
@@ -993,19 +1061,19 @@ class StateEstimator {
                          (laserCloudCornerLast->points[j].z - pointSel.z) *
                              (laserCloudCornerLast->points[j].z - pointSel.z);
 
-            if (int(laserCloudCornerLast->points[j].intensity) >
-                closestPointScan) {
-              if (pointSqDis < minPointSqDis2) {
+            if (int(laserCloudCornerLast->points[j].intensity) > closestPointScan)
+            {
+              if (pointSqDis < minPointSqDis2)
+              {
                 minPointSqDis2 = pointSqDis;
                 minPointInd2 = j;
               }
             }
           }
-          for (int j = closestPointInd - 1; j >= 0; j--) {
-            if (int(laserCloudCornerLast->points[j].intensity) <
-                closestPointScan - 2.5) {
+          for (int j = closestPointInd - 1; j >= 0; j--)
+          {
+            if (int(laserCloudCornerLast->points[j].intensity) < closestPointScan - 2.5)
               break;
-            }
 
             pointSqDis = (laserCloudCornerLast->points[j].x - pointSel.x) *
                              (laserCloudCornerLast->points[j].x - pointSel.x) +
@@ -1014,9 +1082,10 @@ class StateEstimator {
                          (laserCloudCornerLast->points[j].z - pointSel.z) *
                              (laserCloudCornerLast->points[j].z - pointSel.z);
 
-            if (int(laserCloudCornerLast->points[j].intensity) <
-                closestPointScan) {
-              if (pointSqDis < minPointSqDis2) {
+            if (int(laserCloudCornerLast->points[j].intensity) < closestPointScan)
+            {
+              if (pointSqDis < minPointSqDis2)
+              {
                 minPointSqDis2 = pointSqDis;
                 minPointInd2 = j;
               }
@@ -1028,7 +1097,8 @@ class StateEstimator {
         pointSearchCornerInd2[i] = minPointInd2;
       }
 
-      if (pointSearchCornerInd2[i] >= 0) {
+      if (pointSearchCornerInd2[i] >= 0)
+      {
         tripod1 = laserCloudCornerLast->points[pointSearchCornerInd1[i]];
         tripod2 = laserCloudCornerLast->points[pointSearchCornerInd2[i]];
 
@@ -1041,15 +1111,16 @@ class StateEstimator {
         float d12 = (P1xyz - P2xyz).norm();
         float res = r / d12;
 
-        V3D jacxyz =
-            P.transpose() * math_utils::skew(P2xyz - P1xyz) / (d12 * r);
+        V3D jacxyz = P.transpose() * math_utils::skew(P2xyz - P1xyz) / (d12 * r);
 
         float s = 1;
-        if (iterCount >= ICP_FREQ) {
+        if (iterCount >= ICP_FREQ)
+        {
           s = 1 - 1.8 * fabs(res);
         }
 
-        if (s > 0.1 && res != 0) {
+        if (s > 0.1 && res != 0)
+        {
           coeff.x = s * jacxyz(0);
           coeff.y = s * jacxyz(1);
           coeff.z = s * jacxyz(2);
@@ -1063,7 +1134,8 @@ class StateEstimator {
   }
 
   // Undistort point cloud to the start frame
-  void transformToStart(PointType const* const pi, PointType* const po) {
+  void transformToStart(PointType const *const pi, PointType *const po)
+  {
     double s = (1.f / SCAN_PERIOD) * (pi->intensity - int(pi->intensity));
 
     V3D P2xyz(pi->x, pi->y, pi->z);
@@ -1080,7 +1152,8 @@ class StateEstimator {
   }
 
   // Undistort point cloud to the end frame
-  void transformToEnd(PointType const* const pi, PointType* const po) {
+  void transformToEnd(PointType const *const pi, PointType *const po)
+  {
     double s = (1.f / SCAN_PERIOD) * (pi->intensity - int(pi->intensity));
 
     V3D P2xyz(pi->x, pi->y, pi->z);
@@ -1101,7 +1174,8 @@ class StateEstimator {
   }
 
   // Coordinate transformation from LiDAR frame to Vehicle frame
-  void rotatePoint(PointType const* const pi, PointType* const po) {
+  void rotatePoint(PointType const *const pi, PointType *const po)
+  {
     V3D rpy;
     rpy << deg2rad(0.0), deg2rad(0.0), deg2rad(IMU_LIDAR_EXTRINSIC_ANGLE);
     M3D R = rpy2R(rpy);
@@ -1113,86 +1187,70 @@ class StateEstimator {
     po->intensity = pi->intensity;
   }
 
-  void updatePointCloud() {
-    scan_new_->cornerPointsLessSharpYZX_->clear();
-    scan_new_->surfPointsLessFlatYZX_->clear();
-    scan_new_->outlierPointCloudYZX_->clear();
-
+  void updatePointCloud()
+  {
     PointType point;
-    for (int i = 0; i < scan_new_->cornerPointsLessSharp_->points.size(); i++) {
+    for (int i = 0; i < scan_new_->cornerPointsLessSharp_->points.size(); i++)
+    {
       transformToEnd(&scan_new_->cornerPointsLessSharp_->points[i],
                      &scan_new_->cornerPointsLessSharp_->points[i]);
-      point.x = scan_new_->cornerPointsLessSharp_->points[i].y;
-      point.y = scan_new_->cornerPointsLessSharp_->points[i].z;
-      point.z = scan_new_->cornerPointsLessSharp_->points[i].x;
-      point.intensity = scan_new_->cornerPointsLessSharp_->points[i].intensity;
-      scan_new_->cornerPointsLessSharpYZX_->push_back(point);
     }
-    for (int i = 0; i < scan_new_->surfPointsLessFlat_->points.size(); i++) {
+    for (int i = 0; i < scan_new_->surfPointsLessFlat_->points.size(); i++)
+    {
       transformToEnd(&scan_new_->surfPointsLessFlat_->points[i],
                      &scan_new_->surfPointsLessFlat_->points[i]);
-      point.x = scan_new_->surfPointsLessFlat_->points[i].y;
-      point.y = scan_new_->surfPointsLessFlat_->points[i].z;
-      point.z = scan_new_->surfPointsLessFlat_->points[i].x;
-      point.intensity = scan_new_->surfPointsLessFlat_->points[i].intensity;
-      scan_new_->surfPointsLessFlatYZX_->push_back(point);
     }
-    for (int i = 0; i < scan_new_->outlierPointCloud_->points.size(); i++) {
+    for (int i = 0; i < scan_new_->outlierPointCloud_->points.size(); i++)
+    {
       // transformToEnd(&scan_new_->outlierPointCloud_->points[i],
       //                &scan_new_->outlierPointCloud_->points[i]);
-      point.x = scan_new_->outlierPointCloud_->points[i].y;
-      point.y = scan_new_->outlierPointCloud_->points[i].z;
-      point.z = scan_new_->outlierPointCloud_->points[i].x;
-      point.intensity = scan_new_->outlierPointCloud_->points[i].intensity;
-      scan_new_->outlierPointCloudYZX_->push_back(point);
     }
 
-    // Transform XYZ-convention to YZX-convention to meet the mapping module's
-    // requirement
-    globalStateYZX_.rn_ = Q_xyz_to_yzx * globalState_.rn_;
-    globalStateYZX_.qbn_ =
-        Q_xyz_to_yzx * globalState_.qbn_ * Q_xyz_to_yzx.inverse();
-
     if (scan_new_->cornerPointsLessSharp_->points.size() >= 5 &&
-        scan_new_->surfPointsLessFlat_->points.size() >= 20) {
+        scan_new_->surfPointsLessFlat_->points.size() >= 20)
+    {
       kdtreeCorner_->setInputCloud(scan_new_->cornerPointsLessSharp_);
       kdtreeSurf_->setInputCloud(scan_new_->surfPointsLessFlat_);
     }
   }
 
-  void estimateTransform(ScanPtr lastScan, ScanPtr newScan, V3D& t, Q4D& q) {
+  void estimateTransform(ScanPtr lastScan, ScanPtr newScan, V3D &t, Q4D &q)
+  {
     double sum_dt = preintegration_->sum_dt;
     linState_.rn_ = t;
     linState_.qbn_ = q;
-    for (int iter = 0; iter < NUM_ITER; iter++) {
+    for (int iter = 0; iter < NUM_ITER; iter++)
+    {
       keypointSurfs_->clear();
       jacobianCoffSurfs->clear();
       keypointCorns_->clear();
       jacobianCoffCorns->clear();
 
-      findCorrespondingSurfFeatures(lastScan, newScan, keypointSurfs_,
-                                    jacobianCoffSurfs, iter);
-      if (keypointSurfs_->points.size() < 10) {
+      findCorrespondingSurfFeatures(lastScan, newScan, keypointSurfs_, jacobianCoffSurfs, iter);
+      if (keypointSurfs_->points.size() < 10)
+      {
         ROS_WARN("Insufficient matched surfs...");
         continue;
       }
-      findCorrespondingCornerFeatures(lastScan, newScan, keypointCorns_,
-                                      jacobianCoffCorns, iter);
-      if (keypointCorns_->points.size() < 5) {
+
+      findCorrespondingCornerFeatures(lastScan, newScan, keypointCorns_, jacobianCoffCorns, iter);
+      if (keypointCorns_->points.size() < 5)
+      {
         ROS_WARN("Insufficient matched corners...");
         continue;
       }
 
       if (calculateTransformation(lastScan, newScan, keypointCorns_,
                                   jacobianCoffCorns, keypointSurfs_,
-                                  jacobianCoffSurfs, iter)) {
+                                  jacobianCoffSurfs, iter))
+      {
         ROS_INFO_STREAM("System Converges after " << iter << " iterations");
         break;
       }
     }
 
     t = linState_.rn_;
-    q = linState_.qbn_;  // qbn_ is quaternion rotation from b-frame to n-frame
+    q = linState_.qbn_; // qbn_ is quaternion rotation from b-frame to n-frame
   }
 
   bool calculateTransformation(ScanPtr lastScan, ScanPtr newScan,
@@ -1200,7 +1258,8 @@ class StateEstimator {
                                pcl::PointCloud<PointType>::Ptr jacoCornersCoff,
                                pcl::PointCloud<PointType>::Ptr surfs,
                                pcl::PointCloud<PointType>::Ptr jacoSurfsCoff,
-                               int iterCount) {
+                               int iterCount)
+  {
     keypoints_->clear();
     jacobians_->clear();
     (*keypoints_) += (*surfs);
@@ -1225,10 +1284,11 @@ class StateEstimator {
     JTb.setZero();
     x.setZero();
 
-    for (int i = 0; i < pointNum; ++i) {
+    for (int i = 0; i < pointNum; ++i)
+    {
       // Select keypoint i
-      const PointType& keypoint = keypoints_->points[i];
-      const PointType& coeff = jacobians_->points[i];
+      const PointType &keypoint = keypoints_->points[i];
+      const PointType &coeff = jacobians_->points[i];
 
       V3D P2xyz(keypoint.x, keypoint.y, keypoint.z);
       V3D coff_xyz(coeff.x, coeff.y, coeff.z);
@@ -1243,11 +1303,8 @@ class StateEstimator {
       // Translation vector from frame1 to frame2 represented in frame1
       V3D T112xyz = s * linState_.rn_;
 
-      V3D jacobian1xyz =
-          coff_xyz.transpose() *
-          (-R21xyz.toRotationMatrix() * skew(P2xyz));  // rotation jacobian
-      V3D jacobian2xyz =
-          coff_xyz.transpose() * M3D::Identity();  // translation jacobian
+      V3D jacobian1xyz = coff_xyz.transpose() * (-R21xyz.toRotationMatrix() * skew(P2xyz)); // rotation jacobian
+      V3D jacobian2xyz = coff_xyz.transpose() * M3D::Identity();                            // translation jacobian
       double residual = coeff.intensity;
 
       J.block<1, 3>(i, O_R) = jacobian1xyz;
@@ -1266,13 +1323,13 @@ class StateEstimator {
     // Determine whether x is degenerated
     bool isDegenerate = false;
     Eigen::Matrix<double, stateNum, stateNum> matP;
-    if (iterCount == 0) {
+    if (iterCount == 0)
+    {
       Eigen::Matrix<double, 1, stateNum> matE;
       Eigen::Matrix<double, stateNum, stateNum> matV;
       Eigen::Matrix<double, stateNum, stateNum> matV2;
 
-      Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, stateNum, stateNum> >
-          esolver(JTJ);
+      Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, stateNum, stateNum>> esolver(JTJ);
       matE = esolver.eigenvalues().real();
       matV = esolver.eigenvectors().real();
 
@@ -1280,22 +1337,27 @@ class StateEstimator {
 
       isDegenerate = false;
       std::vector<double> eignThre(stateNum, 10.);
-      for (int i = 0; i < stateNum; i++) {
-        // if eigenvalue is less than 10, set the corresponding eigenvector to 0
-        // vector
-        if (matE(0, i) < eignThre[i]) {
-          for (int j = 0; j < stateNum; j++) {
+      for (int i = 0; i < stateNum; i++)
+      {
+        // if eigenvalue is less than 10, set the corresponding eigenvector to 0 vector
+        if (matE(0, i) < eignThre[i])
+        {
+          for (int j = 0; j < stateNum; j++)
+          {
             matV2(i, j) = 0;
           }
           isDegenerate = true;
-        } else {
+        }
+        else
+        {
           break;
         }
       }
       matP = matV.inverse() * matV2;
     }
 
-    if (isDegenerate) {
+    if (isDegenerate)
+    {
       cout << "System is Degenerate." << endl;
       Eigen::Matrix<double, stateNum, 1> matX2(x);
       x = matP * matX2;
@@ -1312,15 +1374,17 @@ class StateEstimator {
     double deltaR = rpy_deg.norm();
     V3D trans = 100 * x.segment<3>(O_P);
     double deltaT = trans.norm();
-    if (deltaR < 0.1 && deltaT < 0.1) {
+    if (deltaR < 0.1 && deltaT < 0.1)
+    {
       return true;
     }
 
     return false;
   }
 
-  void estimateInitialState1(const V3D& p, const Q4D& q, V3D& v0, V3D& v1,
-                             V3D& ba, V3D& bw) {
+  void estimateInitialState1(const V3D &p, const Q4D &q, V3D &v0, V3D &v1,
+                             V3D &ba, V3D &bw)
+  {
     ba = INIT_BA;
     bw = INIT_BW;
 
@@ -1339,8 +1403,9 @@ class StateEstimator {
     cout << "bw0: " << bw.transpose() << endl;
   }
 
-  void estimateInitialState2(const V3D& p, const Q4D& q, V3D& v0, V3D& v1,
-                             V3D& ba, V3D& bw) {
+  void estimateInitialState2(const V3D &p, const Q4D &q, V3D &v0, V3D &v1,
+                             V3D &ba, V3D &bw)
+  {
     const int DIM_OF_STATE = 1 + 1 + 3;
     const int DIM_OF_MEAS = 3 + 3;
     Eigen::Matrix<double, Eigen::Dynamic, DIM_OF_STATE> J(DIM_OF_MEAS,
@@ -1385,8 +1450,9 @@ class StateEstimator {
     cout << "test_ba: " << test_ba.transpose() << endl;
   }
 
-  void estimateInitialState3(const V3D& p, const Q4D& q, V3D& v0, V3D& v1,
-                             V3D& ba, V3D& bw) {
+  void estimateInitialState3(const V3D &p, const Q4D &q, V3D &v0, V3D &v1,
+                             V3D &ba, V3D &bw)
+  {
     double sum_dt = preintegration_->sum_dt;
     V3D v = p / sum_dt;
     // v * sum_dt = (p - 0.5*linState_.gn_*sum_dt*sum_dt -
@@ -1405,8 +1471,9 @@ class StateEstimator {
     cout << "bw0: " << bw.transpose() << endl;
   }
 
-  void estimateInitialState(const V3D& p, const Q4D& q, V3D& v0, V3D& v1,
-                            V3D& ba, V3D& bw) {
+  void estimateInitialState(const V3D &p, const Q4D &q, V3D &v0, V3D &v1,
+                            V3D &ba, V3D &bw)
+  {
     double sum_dt = preintegration_->sum_dt;
     // Calculate a rough velocity using relative translation
     V3D v = p / sum_dt;
@@ -1419,7 +1486,8 @@ class StateEstimator {
   }
 
   // Estimate gyroscope bias using a similar methoed provided in VINS-Mono
-  void solveGyroscopeBias(const Q4D& q, V3D& bw) {
+  void solveGyroscopeBias(const Q4D &q, V3D &bw)
+  {
     Matrix3d A;
     V3D b;
     V3D delta_bg;
@@ -1444,11 +1512,11 @@ class StateEstimator {
     bw += delta_bg;
   }
 
- public:
-  FusionStatus status_;     // system status
-  StatePredictor* filter_;  // Kalman filter pointer
-  ScanPtr scan_new_;        // current scan information
-  ScanPtr scan_last_;       // last scan information
+public:
+  FusionStatus status_;    // system status
+  StatePredictor *filter_; // Kalman filter pointer
+  ScanPtr scan_new_;       // current scan information
+  ScanPtr scan_last_;      // last scan information
 
   // !@KD tree relatives
   pcl::VoxelGrid<PointType> downSizeFilter_;
@@ -1495,17 +1563,10 @@ class StateEstimator {
   MXD Pyinv_;
 
   // !@ IMU preintegration
-  integration::IntegrationBase* preintegration_;
+  integration::IntegrationBase *preintegration_;
   Imu imu_last_;
-
-  // !@Rotation matrices between XYZ-convention and YZX-convention
-  Eigen::Matrix3d R_yzx_to_xyz;
-  Eigen::Matrix3d R_xyz_to_yzx;
-  Eigen::Quaterniond Q_yzx_to_xyz;
-  Eigen::Quaterniond Q_xyz_to_yzx;
-  GlobalState globalStateYZX_;
 };
 
-}  // namespace fusion
+} // namespace fusion
 
-#endif  // INCLUDE_STATEESTIMATOR_HPP_
+#endif // INCLUDE_STATEESTIMATOR_HPP_
