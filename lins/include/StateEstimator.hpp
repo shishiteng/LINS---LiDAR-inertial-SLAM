@@ -630,12 +630,12 @@ namespace fusion
       globalState_.bw_ = filterState.bw_;
       globalState_.gn_ = globalState_.qn_ * filterState.gn_;
 
-      cout << "pn:" << globalState_.pn_.transpose() << endl;
-      cout << "qn_:\n"
-           << globalState_.qn_.toRotationMatrix() << endl;
-      cout << "vn_:" << globalState_.vn_.transpose() << endl;
-      cout << "gn_:" << globalState_.gn_.transpose() << endl
-           << endl;
+      // cout << "pn:" << globalState_.pn_.transpose() << endl;
+      // cout << "qn_:\n"
+      //      << globalState_.qn_.toRotationMatrix() << endl;
+      // cout << "vn_:" << globalState_.vn_.transpose() << endl;
+      // cout << "gn_:" << globalState_.gn_.transpose() << endl
+      //      << endl;
     }
 
     void undistortPcl(ScanPtr scan)
