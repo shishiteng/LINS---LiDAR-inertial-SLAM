@@ -286,13 +286,13 @@ void LinsFusion::publishOdometry(double timeStamp)
   laserOdometry.header.frame_id = "/world";
   laserOdometry.child_frame_id = "/laser_odom";
   laserOdometry.header.stamp = ros::Time().fromSec(timeStamp);
-  laserOdometry.pose.pose.orientation.x = estimator->globalState_.qbn_.x();
-  laserOdometry.pose.pose.orientation.y = estimator->globalState_.qbn_.y();
-  laserOdometry.pose.pose.orientation.z = estimator->globalState_.qbn_.z();
-  laserOdometry.pose.pose.orientation.w = estimator->globalState_.qbn_.w();
-  laserOdometry.pose.pose.position.x = estimator->globalState_.rn_[0];
-  laserOdometry.pose.pose.position.y = estimator->globalState_.rn_[1];
-  laserOdometry.pose.pose.position.z = estimator->globalState_.rn_[2];
+  laserOdometry.pose.pose.orientation.x = estimator->globalState_.qn_.x();
+  laserOdometry.pose.pose.orientation.y = estimator->globalState_.qn_.y();
+  laserOdometry.pose.pose.orientation.z = estimator->globalState_.qn_.z();
+  laserOdometry.pose.pose.orientation.w = estimator->globalState_.qn_.w();
+  laserOdometry.pose.pose.position.x = estimator->globalState_.pn_[0];
+  laserOdometry.pose.pose.position.y = estimator->globalState_.pn_[1];
+  laserOdometry.pose.pose.position.z = estimator->globalState_.pn_[2];
   pubLaserOdometry.publish(laserOdometry);
 
   tf::TransformBroadcaster tfBroadcaster;
@@ -301,12 +301,12 @@ void LinsFusion::publishOdometry(double timeStamp)
   laserOdometryTrans.child_frame_id_ = "/laser_odom";
   laserOdometryTrans.stamp_ = ros::Time().fromSec(timeStamp);
   laserOdometryTrans.setRotation(tf::Quaternion(
-      estimator->globalState_.qbn_.x(), estimator->globalState_.qbn_.y(),
-      estimator->globalState_.qbn_.z(),
-      estimator->globalState_.qbn_.w()));
-  laserOdometryTrans.setOrigin(tf::Vector3(estimator->globalState_.rn_[0],
-                                           estimator->globalState_.rn_[1],
-                                           estimator->globalState_.rn_[2]));
+      estimator->globalState_.qn_.x(), estimator->globalState_.qn_.y(),
+      estimator->globalState_.qn_.z(),
+      estimator->globalState_.qn_.w()));
+  laserOdometryTrans.setOrigin(tf::Vector3(estimator->globalState_.pn_[0],
+                                           estimator->globalState_.pn_[1],
+                                           estimator->globalState_.pn_[2]));
   tfBroadcaster.sendTransform(laserOdometryTrans);
 }
 

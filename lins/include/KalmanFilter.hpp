@@ -52,9 +52,9 @@ public:
               const V3D &bw)
   {
     setIdentity();
-    rn_ = rn;
+    pn_ = rn;
     vn_ = vn;
-    qbn_ = qbn;
+    qn_ = qbn;
     ba_ = ba;
     bw_ = bw;
   }
@@ -63,9 +63,9 @@ public:
 
   void setIdentity()
   {
-    rn_.setZero();
+    pn_.setZero();
     vn_.setZero();
-    qbn_.setIdentity();
+    qn_.setIdentity();
     ba_.setZero();
     bw_.setZero();
     gn_ << 0.0, 0.0, -G0;
@@ -75,12 +75,12 @@ public:
   void boxPlus(const Eigen::Matrix<double, DIM_OF_STATE_, 1> &xk,
                GlobalState &stateOut)
   {
-    stateOut.rn_ = rn_ + xk.template segment<3>(pos_);
+    stateOut.pn_ = pn_ + xk.template segment<3>(pos_);
     stateOut.vn_ = vn_ + xk.template segment<3>(vel_);
     stateOut.ba_ = ba_ + xk.template segment<3>(acc_);
     stateOut.bw_ = bw_ + xk.template segment<3>(gyr_);
     Q4D dq = axis2Quat(xk.template segment<3>(att_));
-    stateOut.qbn_ = (qbn_ * dq).normalized();
+    stateOut.qn_ = (qn_ * dq).normalized();
 
     stateOut.gn_ = gn_ + xk.template segment<3>(gra_);
   }
@@ -89,11 +89,11 @@ public:
   void boxMinus(const GlobalState &stateIn,
                 Eigen::Matrix<double, DIM_OF_STATE_, 1> &xk)
   {
-    xk.template segment<3>(pos_) = rn_ - stateIn.rn_;
+    xk.template segment<3>(pos_) = pn_ - stateIn.pn_;
     xk.template segment<3>(vel_) = vn_ - stateIn.vn_;
     xk.template segment<3>(acc_) = ba_ - stateIn.ba_;
     xk.template segment<3>(gyr_) = bw_ - stateIn.bw_;
-    V3D da = Quat2axis(stateIn.qbn_.inverse() * qbn_);
+    V3D da = Quat2axis(stateIn.qn_.inverse() * qn_);
     xk.template segment<3>(att_) = da;
 
     xk.template segment<3>(gra_) = gn_ - stateIn.gn_;
@@ -104,9 +104,9 @@ public:
     if (this == &other)
       return *this;
 
-    this->rn_ = other.rn_;
+    this->pn_ = other.pn_;
     this->vn_ = other.vn_;
-    this->qbn_ = other.qbn_;
+    this->qn_ = other.qn_;
     this->ba_ = other.ba_;
     this->bw_ = other.bw_;
     this->gn_ = other.gn_;
@@ -115,9 +115,9 @@ public:
   }
 
   // !@State
-  V3D rn_;  // position in n-frame
+  V3D pn_;  // position in n-frame
   V3D vn_;  // velocity in n-frame
-  Q4D qbn_; // rotation from b-frame to n-frame
+  Q4D qn_; // rotation from b-frame to n-frame
   V3D ba_;  // acceleartion bias
   V3D bw_;  // gyroscope bias
   V3D gn_;  // gravity
@@ -145,15 +145,15 @@ public:
 
     // Average acceleration and angular rate
     GlobalState state_tmp = state_;
-    V3D un_acc_0 = state_tmp.qbn_ * (acc_last - state_tmp.ba_) + state_tmp.gn_;
+    V3D un_acc_0 = state_tmp.qn_ * (acc_last - state_tmp.ba_) + state_tmp.gn_;
     V3D un_gyr = 0.5 * (gyr_last + gyr) - state_tmp.bw_;
     Q4D dq = axis2Quat(un_gyr * dt);
-    state_tmp.qbn_ = (state_tmp.qbn_ * dq).normalized();
-    V3D un_acc_1 = state_tmp.qbn_ * (acc - state_tmp.ba_) + state_tmp.gn_;
+    state_tmp.qn_ = (state_tmp.qn_ * dq).normalized();
+    V3D un_acc_1 = state_tmp.qn_ * (acc - state_tmp.ba_) + state_tmp.gn_;
     V3D un_acc = 0.5 * (un_acc_0 + un_acc_1);
 
     // State integral
-    state_tmp.rn_ = state_tmp.rn_ + dt * state_tmp.vn_ + 0.5 * dt * dt * un_acc;
+    state_tmp.pn_ = state_tmp.pn_ + dt * state_tmp.vn_ + 0.5 * dt * dt * un_acc;
     state_tmp.vn_ = state_tmp.vn_ + dt * un_acc;
 
     if (update_jacobian_)
@@ -162,9 +162,9 @@ public:
       Ft.block<3, 3>(GlobalState::pos_, GlobalState::vel_) = M3D::Identity();
 
       Ft.block<3, 3>(GlobalState::vel_, GlobalState::att_) =
-          -state_tmp.qbn_.toRotationMatrix() * skew(acc - state_tmp.ba_);
+          -state_tmp.qn_.toRotationMatrix() * skew(acc - state_tmp.ba_);
       Ft.block<3, 3>(GlobalState::vel_, GlobalState::acc_) =
-          -state_tmp.qbn_.toRotationMatrix();
+          -state_tmp.qn_.toRotationMatrix();
       Ft.block<3, 3>(GlobalState::vel_, GlobalState::gra_) = M3D::Identity();
 
       Ft.block<3, 3>(GlobalState::att_, GlobalState::att_) =
@@ -172,7 +172,7 @@ public:
       Ft.block<3, 3>(GlobalState::att_, GlobalState::gyr_) = -M3D::Identity();
 
       MXD Gt = MXD::Zero(GlobalState::DIM_OF_STATE_, GlobalState::DIM_OF_NOISE_);
-      Gt.block<3, 3>(GlobalState::vel_, 0) = -state_tmp.qbn_.toRotationMatrix();
+      Gt.block<3, 3>(GlobalState::vel_, 0) = -state_tmp.qn_.toRotationMatrix();
       Gt.block<3, 3>(GlobalState::att_, 3) = -M3D::Identity();
       Gt.block<3, 3>(GlobalState::acc_, 6) = M3D::Identity();
       Gt.block<3, 3>(GlobalState::gyr_, 9) = M3D::Identity();
@@ -332,9 +332,9 @@ public:
   {
     if (type == 0)
     {
-      state_.rn_.setZero();
-      state_.vn_ = state_.qbn_.inverse() * state_.vn_;
-      state_.qbn_.setIdentity();
+      state_.pn_.setZero();
+      state_.vn_ = state_.qn_.inverse() * state_.vn_;
+      state_.qn_.setIdentity();
       initializeCovariance();
     }
     else if (type == 1)
@@ -357,18 +357,18 @@ public:
       covariance_.block<3, 3>(GlobalState::pos_, GlobalState::pos_) =
           covPos.asDiagonal(); // pos
       covariance_.block<3, 3>(GlobalState::vel_, GlobalState::vel_) =
-          state_.qbn_.inverse() * vel_cov * state_.qbn_; // vel
+          state_.qn_.inverse() * vel_cov * state_.qn_; // vel
       covariance_.block<3, 3>(GlobalState::att_, GlobalState::att_) =
           V3D(covRoll, covPitch, covYaw).asDiagonal(); // att
       covariance_.block<3, 3>(GlobalState::acc_, GlobalState::acc_) = acc_cov;
       covariance_.block<3, 3>(GlobalState::gyr_, GlobalState::gyr_) = gyr_cov;
       covariance_.block<3, 3>(GlobalState::gra_, GlobalState::gra_) =
-          state_.qbn_.inverse() * gra_cov * state_.qbn_;
+          state_.qn_.inverse() * gra_cov * state_.qn_;
 
-      state_.rn_.setZero();
-      state_.vn_ = state_.qbn_.inverse() * state_.vn_;
-      state_.qbn_.setIdentity();
-      state_.gn_ = state_.qbn_.inverse() * state_.gn_;
+      state_.pn_.setZero();
+      state_.vn_ = state_.qn_.inverse() * state_.vn_;
+      state_.qn_.setIdentity();
+      state_.gn_ = state_.qn_.inverse() * state_.gn_;
       state_.gn_ = state_.gn_ * 9.81 / state_.gn_.norm();
       // initializeCovariance(1);
     }

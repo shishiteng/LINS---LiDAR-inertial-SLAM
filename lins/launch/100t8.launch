@@ -1,7 +1,7 @@
 <launch>
     
     <!--- Run Rviz-->
-    <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find lins)/config/lins_rviz_config.rviz" /> -->
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find lins)/config/lins_rviz_config.rviz" />
  
     <!--- Config Path -->
     <arg name="config_path" default = "$(find lins)/config/100t8.yaml" />
