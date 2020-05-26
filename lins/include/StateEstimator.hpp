@@ -630,7 +630,7 @@ namespace fusion
       globalState_.bw_ = filterState.bw_;
       globalState_.gn_ = globalState_.qn_ * filterState.gn_;
 
-      cout << "rn:" << globalState_.pn_.transpose() << endl;
+      cout << "pn:" << globalState_.pn_.transpose() << endl;
       cout << "qn_:\n"
            << globalState_.qn_.toRotationMatrix() << endl;
       cout << "vn_:" << globalState_.vn_.transpose() << endl;

@@ -48,11 +48,10 @@ public:
 
   GlobalState() { setIdentity(); }
 
-  GlobalState(const V3D &rn, const V3D &vn, const Q4D &qbn, const V3D &ba,
-              const V3D &bw)
+  GlobalState(const V3D &pn, const V3D &vn, const Q4D &qbn, const V3D &ba, const V3D &bw)
   {
     setIdentity();
-    pn_ = rn;
+    pn_ = pn;
     vn_ = vn;
     qn_ = qbn;
     ba_ = ba;
@@ -72,8 +71,7 @@ public:
   }
 
   // boxPlus operator
-  void boxPlus(const Eigen::Matrix<double, DIM_OF_STATE_, 1> &xk,
-               GlobalState &stateOut)
+  void boxPlus(const Eigen::Matrix<double, DIM_OF_STATE_, 1> &xk, GlobalState &stateOut)
   {
     stateOut.pn_ = pn_ + xk.template segment<3>(pos_);
     stateOut.vn_ = vn_ + xk.template segment<3>(vel_);
@@ -86,8 +84,7 @@ public:
   }
 
   // boxMinus operator
-  void boxMinus(const GlobalState &stateIn,
-                Eigen::Matrix<double, DIM_OF_STATE_, 1> &xk)
+  void boxMinus(const GlobalState &stateIn, Eigen::Matrix<double, DIM_OF_STATE_, 1> &xk)
   {
     xk.template segment<3>(pos_) = pn_ - stateIn.pn_;
     xk.template segment<3>(vel_) = vn_ - stateIn.vn_;
@@ -208,21 +205,21 @@ public:
     covariance_ = covariance;
   }
 
-  void initialization(double time, const V3D &rn, const V3D &vn, const Q4D &qbn,
+  void initialization(double time, const V3D &pn, const V3D &vn, const Q4D &qbn,
                       const V3D &ba, const V3D &bw)
   {
-    state_ = GlobalState(rn, vn, qbn, ba, bw);
+    state_ = GlobalState(pn, vn, qbn, ba, bw);
     time_ = time;
     flag_init_state_ = true;
 
     initializeCovariance();
   }
 
-  void initialization(double time, const V3D &rn, const V3D &vn, const Q4D &qbn,
+  void initialization(double time, const V3D &pn, const V3D &vn, const Q4D &qbn,
                       const V3D &ba, const V3D &bw, const V3D &acc,
                       const V3D &gyr)
   {
-    state_ = GlobalState(rn, vn, qbn, ba, bw);
+    state_ = GlobalState(pn, vn, qbn, ba, bw);
     time_ = time;
     acc_last = acc;
     gyr_last = gyr;
@@ -232,22 +229,22 @@ public:
     initializeCovariance();
   }
 
-  void initialization(double time, const V3D &rn, const V3D &vn, const V3D &ba,
+  void initialization(double time, const V3D &pn, const V3D &vn, const V3D &ba,
                       const V3D &bw, double roll = 0.0, double pitch = 0.0,
                       double yaw = 0.0)
   {
-    state_ = GlobalState(rn, vn, rpy2Quat(V3D(roll, pitch, yaw)), ba, bw);
+    state_ = GlobalState(pn, vn, rpy2Quat(V3D(roll, pitch, yaw)), ba, bw);
     time_ = time;
     flag_init_state_ = true;
 
     initializeCovariance();
   }
 
-  void initialization(double time, const V3D &rn, const V3D &vn, const V3D &ba,
+  void initialization(double time, const V3D &pn, const V3D &vn, const V3D &ba,
                       const V3D &bw, const V3D &acc, const V3D &gyr,
                       double roll = 0.0, double pitch = 0.0, double yaw = 0.0)
   {
-    state_ = GlobalState(rn, vn, rpy2Quat(V3D(roll, pitch, yaw)), ba, bw);
+    state_ = GlobalState(pn, vn, rpy2Quat(V3D(roll, pitch, yaw)), ba, bw);
     time_ = time;
     acc_last = acc;
     gyr_last = gyr;
