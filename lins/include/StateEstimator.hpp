@@ -1143,6 +1143,7 @@ namespace fusion
     // Undistort point cloud to the start frame
     void transformToStart(PointType const *const pi, PointType *const po)
     {
+#if 0
       double s = (1.f / SCAN_PERIOD) * (pi->intensity - int(pi->intensity));
 
       V3D P2xyz(pi->x, pi->y, pi->z);
@@ -1156,6 +1157,14 @@ namespace fusion
       po->y = P1xyz.y();
       po->z = P1xyz.z();
       po->intensity = pi->intensity;
+#else
+      V3D p_ori(pi->x, pi->y, pi->z);
+      V3D p = linState_.qn_ * p_ori + linState_.pn_;
+      po->x = p.x();
+      po->y = p.y();
+      po->z = p.z();
+      po->intensity = pi->intensity;
+#endif
     }
 
     // Undistort point cloud to the end frame
@@ -1199,13 +1208,11 @@ namespace fusion
       PointType point;
       for (int i = 0; i < scan_new_->cornerPointsLessSharp_->points.size(); i++)
       {
-        transformToEnd(&scan_new_->cornerPointsLessSharp_->points[i],
-                       &scan_new_->cornerPointsLessSharp_->points[i]);
+        // transformToEnd(&scan_new_->cornerPointsLessSharp_->points[i], &scan_new_->cornerPointsLessSharp_->points[i]);
       }
       for (int i = 0; i < scan_new_->surfPointsLessFlat_->points.size(); i++)
       {
-        transformToEnd(&scan_new_->surfPointsLessFlat_->points[i],
-                       &scan_new_->surfPointsLessFlat_->points[i]);
+        // transformToEnd(&scan_new_->surfPointsLessFlat_->points[i], &scan_new_->surfPointsLessFlat_->points[i]);
       }
       for (int i = 0; i < scan_new_->outlierPointCloud_->points.size(); i++)
       {
