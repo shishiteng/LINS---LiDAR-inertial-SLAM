@@ -7,7 +7,9 @@
         "hash_map": "cpp",
         "hash_set": "cpp",
         "initializer_list": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "core": "cpp",
+        "numericaldiff": "cpp"
     },
     "python.autoComplete.extraPaths": [
         "/home/sst/catkin_lins/devel/lib/python2.7/dist-packages",

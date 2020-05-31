@@ -188,6 +188,8 @@ namespace fusion
       kdtreeSurf_.reset(new pcl::KdTreeFLANN<PointType>());
       scan_new_.reset(new Scan());
       scan_last_.reset(new Scan());
+      scan_imu_new_.reset(new Scan());
+      scan_imu_last_.reset(new Scan());
 
       keypoints_.reset(new pcl::PointCloud<PointType>());
       jacobians_.reset(new pcl::PointCloud<PointType>());
@@ -280,6 +282,10 @@ namespace fusion
       calculateSmoothness(scan_new_);
       markOccludedPoints(scan_new_);
       extractFeatures(scan_new_);
+
+      // 新增加
+      transformFeaturesToImuframe(scan_new_, scan_imu_new_);
+
       imu_last_ = imu;
       double time_fea = ts_fea.toc();
 
@@ -357,8 +363,8 @@ namespace fusion
                               V3D(0, 0, 0), V3D(0, 0, 0), imu_last_.acc,
                               imu_last_.gyr);
 
-      kdtreeCorner_->setInputCloud(scan_new_->cornerPointsLessSharp_);
-      kdtreeSurf_->setInputCloud(scan_new_->surfPointsLessFlat_);
+      kdtreeCorner_->setInputCloud(scan_imu_new_->cornerPointsLessSharp_);
+      kdtreeSurf_->setInputCloud(scan_imu_new_->surfPointsLessFlat_);
 
       pos_.setZero();
       vel_.setZero();
@@ -367,6 +373,9 @@ namespace fusion
       // Slide the point cloud from scan_new_ to scan_last_
       scan_last_.swap(scan_new_);
       scan_new_.reset(new Scan());
+
+      scan_imu_last_.swap(scan_imu_new_);
+      scan_imu_new_.reset(new Scan());
 
       return true;
     }
@@ -394,7 +403,8 @@ namespace fusion
       pl = preintegration_->delta_p +
            0.5 * linState_.gn_ * preintegration_->sum_dt * preintegration_->sum_dt -
            0.5 * ba0 * preintegration_->sum_dt * preintegration_->sum_dt;
-      estimateTransform(scan_last_, scan_new_, pl, ql);
+      // estimateTransform(scan_last_, scan_new_, pl, ql);
+      estimateTransform(scan_imu_last_, scan_imu_new_, pl, ql);
 
       // Calculate initial state using relative transform calculated by point
       // clouds and that by IMU preintegration
@@ -419,6 +429,9 @@ namespace fusion
 
       scan_last_.swap(scan_new_);
       scan_new_.reset(new Scan());
+
+      scan_imu_last_.swap(scan_imu_new_);
+      scan_imu_new_.reset(new Scan());
 
       return true;
     }
@@ -461,6 +474,9 @@ namespace fusion
       scan_last_.swap(scan_new_);
       scan_new_.reset(new Scan());
 
+      scan_imu_last_.swap(scan_imu_new_);
+      scan_imu_new_.reset(new Scan());
+
       return true;
     }
 
@@ -475,6 +491,13 @@ namespace fusion
       bool hasConverged = false;
       bool hasDiverged = false;
       const unsigned int DIM_OF_STATE = GlobalState::DIM_OF_STATE_;
+
+#if 0
+      //
+    // scan_last_
+    // scan_new_
+#endif
+
       for (int iter = 0; iter < NUM_ITER && !hasConverged && !hasDiverged; iter++)
       {
         keypointSurfs_->clear();
@@ -483,7 +506,7 @@ namespace fusion
         jacobianCoffCorns->clear();
 
         // Find corresponding features
-        findCorrespondingSurfFeatures(scan_last_, scan_new_, keypointSurfs_, jacobianCoffSurfs, iter);
+        findCorrespondingSurfFeatures(scan_imu_last_, scan_imu_new_, keypointSurfs_, jacobianCoffSurfs, iter);
         if (keypointSurfs_->points.size() < 10)
         {
           if (VERBOSE)
@@ -491,7 +514,7 @@ namespace fusion
             ROS_WARN("Insufficient matched surfs...");
           }
         }
-        findCorrespondingCornerFeatures(scan_last_, scan_new_, keypointCorns_, jacobianCoffCorns, iter);
+        findCorrespondingCornerFeatures(scan_imu_last_, scan_imu_new_, keypointCorns_, jacobianCoffCorns, iter);
         if (keypointCorns_->points.size() < 5)
         {
           if (VERBOSE)
@@ -592,7 +615,8 @@ namespace fusion
         ROS_WARN("======Using ICP Method======");
         V3D t = filterState.pn_;
         Q4D q = filterState.qn_;
-        estimateTransform(scan_last_, scan_new_, t, q);
+        // estimateTransform(scan_last_, scan_new_, t, q);
+        estimateTransform(scan_imu_last_, scan_imu_new_, t, q);
         filterState.pn_ = t;
         filterState.qn_ = q;
         filter_->update(filterState, Pk_);
@@ -884,6 +908,23 @@ namespace fusion
       }
     }
 
+    void transformFeaturesToImuframe(ScanPtr scanLidar, ScanPtr scanImu)
+    {
+      Eigen::Matrix4d l2i = Eigen::Matrix4d::Identity(); // lidar to imu in imu frame
+      l2i.block(0, 0, 3, 3) = INIT_RBL.toRotationMatrix();
+      l2i.block(0, 3, 3, 1) = INIT_TBL;
+      Eigen::Matrix4d aaa = l2i.inverse();
+      l2i = aaa;
+
+      pcl::transformPointCloud(*scanLidar->distPointCloud_, *scanImu->distPointCloud_, l2i);
+      pcl::transformPointCloud(*scanLidar->undistPointCloud_, *scanImu->undistPointCloud_, l2i);
+      pcl::transformPointCloud(*scanLidar->outlierPointCloud_, *scanImu->outlierPointCloud_, l2i);
+      pcl::transformPointCloud(*scanLidar->cornerPointsSharp_, *scanImu->cornerPointsSharp_, l2i);
+      pcl::transformPointCloud(*scanLidar->cornerPointsLessSharp_, *scanImu->cornerPointsLessSharp_, l2i);
+      pcl::transformPointCloud(*scanLidar->surfPointsFlat_, *scanImu->surfPointsFlat_, l2i);
+      pcl::transformPointCloud(*scanLidar->surfPointsLessFlat_, *scanImu->surfPointsLessFlat_, l2i);
+    }
+
     void findCorrespondingSurfFeatures(
         ScanPtr lastScan, ScanPtr newScan,
         pcl::PointCloud<PointType>::Ptr keypoints,
@@ -896,10 +937,19 @@ namespace fusion
         PointType pointSel;
         PointType coeff, tripod1, tripod2, tripod3;
 
+#if 1
         transformToStart(&newScan->surfPointsFlat_->points[i], &pointSel);
-
         pcl::PointCloud<PointType>::Ptr laserCloudSurfLast = lastScan->surfPointsLessFlat_;
+#else
+        // 把last和current的点云都转到imu坐标系下
+        Eigen::Vector3d point_ori(newScan->surfPointsFlat_->points[i].x, newScan->surfPointsFlat_->points[i].y, newScan->surfPointsFlat_->points[i].z);
+        Eigen::Matrix3d R_i2l;
+        Eigen::Vector3d T_i2l;
+        Eigen::Vector3d point_sel = trans_l2i * point_ori;
+        point_sel = linState_.qn_ * point_sel + linState_.pn_;
 
+        pcl::PointCloud<PointType>::Ptr laserCloudSurfLast
+#endif
         if (iterCount % ICP_FREQ == 0)
         {
           std::vector<int> pointSearchInd;
@@ -1042,8 +1092,7 @@ namespace fusion
         {
           std::vector<int> pointSearchInd;
           std::vector<float> pointSearchSqDis;
-          kdtreeCorner_->nearestKSearch(pointSel, 1, pointSearchInd,
-                                        pointSearchSqDis);
+          kdtreeCorner_->nearestKSearch(pointSel, 1, pointSearchInd, pointSearchSqDis);
           int closestPointInd = -1, minPointInd2 = -1;
 
           if (pointSearchSqDis[0] < NEAREST_FEATURE_SEARCH_SQ_DIST)
@@ -1220,11 +1269,11 @@ namespace fusion
         //                &scan_new_->outlierPointCloud_->points[i]);
       }
 
-      if (scan_new_->cornerPointsLessSharp_->points.size() >= 5 &&
-          scan_new_->surfPointsLessFlat_->points.size() >= 20)
+      if (scan_imu_new_->cornerPointsLessSharp_->points.size() >= 5 &&
+          scan_imu_new_->surfPointsLessFlat_->points.size() >= 20)
       {
-        kdtreeCorner_->setInputCloud(scan_new_->cornerPointsLessSharp_);
-        kdtreeSurf_->setInputCloud(scan_new_->surfPointsLessFlat_);
+        kdtreeCorner_->setInputCloud(scan_imu_new_->cornerPointsLessSharp_);
+        kdtreeSurf_->setInputCloud(scan_imu_new_->surfPointsLessFlat_);
       }
     }
 
@@ -1530,6 +1579,8 @@ namespace fusion
     StatePredictor *filter_; // Kalman filter pointer
     ScanPtr scan_new_;       // current scan information
     ScanPtr scan_last_;      // last scan information
+    ScanPtr scan_imu_new_;
+    ScanPtr scan_imu_last_;
 
     // !@KD tree relatives
     pcl::VoxelGrid<PointType> downSizeFilter_;
