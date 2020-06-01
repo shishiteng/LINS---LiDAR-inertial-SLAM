@@ -22,7 +22,7 @@ lidar_std: 0.01
 # topic names
 imu_topic: "/imu0"
 lidar_topic: "/rslidar_points"
-lidar_odometry_topic: "/local_laser_odom"
+lidar_odometry_topic: "/laser_odom_to_init"
 lidar_mapping_topic: "/integrated_to_init"
 
 # noice parameters
@@ -75,21 +75,20 @@ init_bw: !!opencv-matrix
    data: [0.0,0.0,0.0]
    
 # extrinsic parameters
-init_tbl: !!opencv-matrix
+init_ti2l: !!opencv-matrix
    rows: 3
    cols: 1
    dt: d
    data: [-0.003350330582203402, 0.0334020595702096, 0.0382448998361715]
    
-init_rbl: !!opencv-matrix
+init_ri2l: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
    data:  [ 0.0114318398343499, 0.012846239026906, -0.9998600715418787, 
            -0.9999218409705174, 0.007135352162451601, -0.0113390788033412, 
             0.006988718210393499, 0.9998960369567579, 0.0129260498927925]
-   
-
-
-
+   # data:  [ 0.000001, 0.087149, -0.996195,
+   #         -1.000000, 0.000115, -0.000115,
+   #          0.000001, 0.996195, 0.087149]
 

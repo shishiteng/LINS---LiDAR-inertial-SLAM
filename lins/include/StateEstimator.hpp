@@ -311,6 +311,7 @@ namespace fusion
 
       printf("process features: %lfms\n", time_fea);
       printf("        optimize: %lfms\n", time_opt);
+      cout << "q: " << math_utils::Q2rpy(globalState_.qn_).transpose() * 57.3 << endl;
       // if (VERBOSE) {
       //   duration_fea_ =
       //       (duration_fea_ * lidar_counter_ + time_fea) / (lidar_counter_ + 1);
@@ -332,6 +333,8 @@ namespace fusion
     // Initialize the Kalman filter and KD tree
     bool processFirstScan()
     {
+      ROS_INFO("processFirstScan");
+
       if (scan_new_->cornerPointsLessSharp_->points.size() < 10 ||
           scan_new_->surfPointsLessFlat_->points.size() < 100)
       {
@@ -358,10 +361,25 @@ namespace fusion
       // Initialize IMU preintegration variable
       preintegration_ = new integration::IntegrationBase(imu_last_.acc, imu_last_.gyr, INIT_BA, INIT_BW);
 
-      // Initialize position, velocity, acceleration bias, gyroscope bias by zeros
+#if 0
+      Initialize position, velocity, acceleration bias, gyroscope bias by zeros
       filter_->initialization(scan_new_->time_, V3D(0, 0, 0), V3D(0, 0, 0),
                               V3D(0, 0, 0), V3D(0, 0, 0), imu_last_.acc,
                               imu_last_.gyr);
+#else
+
+      double roll = deg2rad(-0.5);
+      double pitch = deg2rad(89.2);
+      // double roll, pitch;
+      // calculateRPfromGravity(imu_last_.acc, roll, pitch);
+      filter_->initialization(scan_new_->time_,
+                              V3D(0, 0, 0),
+                              V3D(0, 0, 0),
+                              V3D(0, 0, 0),
+                              V3D(0, 0, 0),
+                              imu_last_.acc,
+                              imu_last_.gyr);
+#endif
 
       kdtreeCorner_->setInputCloud(scan_imu_new_->cornerPointsLessSharp_);
       kdtreeSurf_->setInputCloud(scan_imu_new_->surfPointsLessFlat_);
@@ -384,6 +402,8 @@ namespace fusion
     // IMU preintegration results
     bool processSecondScan()
     {
+      ROS_INFO("processSecondScan");
+
       if (scan_new_->cornerPointsLessSharp_->points.size() < 10 ||
           scan_new_->surfPointsLessFlat_->points.size() < 100)
       {
@@ -412,12 +432,15 @@ namespace fusion
       estimateInitialState3(pl, ql, v0, v1, ba0, bw0);
 
       // Initialize the Kalman filter by estimated values
-      V3D p1 = pl;
-      filter_->initialization(scan_new_->time_, p1, v1, ba0, bw0, imu_last_.acc, imu_last_.gyr);
+      // V3D p1 = pl;
+      // filter_->initialization(scan_new_->time_, p1, v1, ba0, bw0, imu_last_.acc, imu_last_.gyr);
 
       double roll_init, pitch_init, yaw_init = deg2rad(0.0);
-      // Calculate rough roll and pitch angles using IMU measurements
       calculateRPfromGravity(imu_last_.acc - ba0, roll_init, pitch_init);
+
+      V3D p1 = pl;
+      filter_->initialization(scan_new_->time_, p1, v1, ba0, bw0, imu_last_.acc, imu_last_.gyr, roll_init, pitch_init);
+      filter_->state_.gn_ = -(imu_last_.acc - ba0);
 
       // Initialize the global state, e.g., position, velocity, and orientation
       // represented in the original frame (the first-scan-frame)
@@ -447,6 +470,8 @@ namespace fusion
 
     bool processScan()
     {
+      ROS_INFO("processScan");
+
       if (scan_new_->cornerPointsLessSharp_->points.size() <= 5 ||
           scan_new_->surfPointsLessFlat_->points.size() <= 10)
       {
@@ -464,8 +489,13 @@ namespace fusion
       // Because the estimated gravity is represented in the b-frame, we can
       // directly solve more accurate roll and pitch angles to correct the global
       // state
+      // filter_->state_.gn_ = V3D(0, -G0, 0);
       calculateRPfromGravity(filter_->state_.gn_, roll, pitch);
       correctRollPitch(roll, pitch);
+
+      // t_wl = t_wi*t_il
+      globalState_.pl_ = globalState_.pn_ - globalState_.qn_ * INIT_RI2L.inverse() * INIT_TI2L;
+      globalState_.ql_ = globalState_.qn_ * INIT_RI2L.inverse();
 
       // Undistort point cloud using estimated relative transform
       updatePointCloud();
@@ -491,12 +521,6 @@ namespace fusion
       bool hasConverged = false;
       bool hasDiverged = false;
       const unsigned int DIM_OF_STATE = GlobalState::DIM_OF_STATE_;
-
-#if 0
-      //
-    // scan_last_
-    // scan_new_
-#endif
 
       for (int iter = 0; iter < NUM_ITER && !hasConverged && !hasDiverged; iter++)
       {
@@ -635,6 +659,9 @@ namespace fusion
     {
       pitch = -sign(fbib.z()) * asin(fbib.x() / G0);
       roll = sign(fbib.z()) * asin(fbib.y() / G0);
+
+      cout << fbib.transpose() << endl;
+      ROS_WARN("rp refine: %lf %lf", roll, pitch);
     }
 
     // Update the gloabl state by the new relative transformation
@@ -656,6 +683,7 @@ namespace fusion
       //      << endl;
       // cout << "ba_:" << globalState_.ba_.transpose() << endl;
       // cout << "bw_:" << globalState_.bw_.transpose() << endl;
+      // cout << "integrate q: " << math_utils::Q2rpy(globalState_.qn_).transpose() * 57.3 << endl;
     }
 
     void undistortPcl(ScanPtr scan)
@@ -910,11 +938,10 @@ namespace fusion
 
     void transformFeaturesToImuframe(ScanPtr scanLidar, ScanPtr scanImu)
     {
-      Eigen::Matrix4d l2i = Eigen::Matrix4d::Identity(); // lidar to imu in imu frame
-      l2i.block(0, 0, 3, 3) = INIT_RBL.toRotationMatrix();
-      l2i.block(0, 3, 3, 1) = INIT_TBL;
-      Eigen::Matrix4d aaa = l2i.inverse();
-      l2i = aaa;
+      Eigen::Matrix4d i2l = Eigen::Matrix4d::Identity(); // lidar to imu in imu frame
+      i2l.block(0, 0, 3, 3) = INIT_RI2L.toRotationMatrix();
+      i2l.block(0, 3, 3, 1) = INIT_TI2L;
+      Eigen::Matrix4d l2i = i2l.inverse();
 
       pcl::transformPointCloud(*scanLidar->distPointCloud_, *scanImu->distPointCloud_, l2i);
       pcl::transformPointCloud(*scanLidar->undistPointCloud_, *scanImu->undistPointCloud_, l2i);

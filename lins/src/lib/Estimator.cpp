@@ -139,8 +139,7 @@ namespace fusion
     imuBuf_.getLastMeas(imu);
 
     // Initialize the iterative-ESKF by the first PCL
-    estimator->processPCL(scan_time_, imu, distortedPointCloud, cloudInfoMsg,
-                          outlierPointCloud);
+    estimator->processPCL(scan_time_, imu, distortedPointCloud, cloudInfoMsg, outlierPointCloud);
 
     // Clear all the PCLs before the initialization PCL
     pclBuf_.clean(estimator->getTime());
@@ -287,13 +286,13 @@ namespace fusion
     laserOdometry.header.frame_id = "/world";
     laserOdometry.child_frame_id = "/laser_odom";
     laserOdometry.header.stamp = ros::Time().fromSec(timeStamp);
-    laserOdometry.pose.pose.orientation.x = estimator->globalState_.qn_.x();
-    laserOdometry.pose.pose.orientation.y = estimator->globalState_.qn_.y();
-    laserOdometry.pose.pose.orientation.z = estimator->globalState_.qn_.z();
-    laserOdometry.pose.pose.orientation.w = estimator->globalState_.qn_.w();
-    laserOdometry.pose.pose.position.x = estimator->globalState_.pn_[0];
-    laserOdometry.pose.pose.position.y = estimator->globalState_.pn_[1];
-    laserOdometry.pose.pose.position.z = estimator->globalState_.pn_[2];
+    laserOdometry.pose.pose.orientation.x = estimator->globalState_.ql_.x();
+    laserOdometry.pose.pose.orientation.y = estimator->globalState_.ql_.y();
+    laserOdometry.pose.pose.orientation.z = estimator->globalState_.ql_.z();
+    laserOdometry.pose.pose.orientation.w = estimator->globalState_.ql_.w();
+    laserOdometry.pose.pose.position.x = estimator->globalState_.pl_[0];
+    laserOdometry.pose.pose.position.y = estimator->globalState_.pl_[1];
+    laserOdometry.pose.pose.position.z = estimator->globalState_.pl_[2];
     pubLaserOdometry.publish(laserOdometry);
 
     tf::TransformBroadcaster tfBroadcaster;
@@ -302,12 +301,13 @@ namespace fusion
     laserOdometryTrans.child_frame_id_ = "/laser_odom";
     laserOdometryTrans.stamp_ = ros::Time().fromSec(timeStamp);
     laserOdometryTrans.setRotation(tf::Quaternion(
-        estimator->globalState_.qn_.x(), estimator->globalState_.qn_.y(),
-        estimator->globalState_.qn_.z(),
-        estimator->globalState_.qn_.w()));
-    laserOdometryTrans.setOrigin(tf::Vector3(estimator->globalState_.pn_[0],
-                                             estimator->globalState_.pn_[1],
-                                             estimator->globalState_.pn_[2]));
+        estimator->globalState_.ql_.x(), 
+        estimator->globalState_.ql_.y(),
+        estimator->globalState_.ql_.z(),
+        estimator->globalState_.ql_.w()));
+    laserOdometryTrans.setOrigin(tf::Vector3(estimator->globalState_.pl_[0],
+                                             estimator->globalState_.pl_[1],
+                                             estimator->globalState_.pl_[2]));
     tfBroadcaster.sendTransform(laserOdometryTrans);
   }
 

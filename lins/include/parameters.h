@@ -149,8 +149,8 @@ extern V3D INIT_BA;
 extern V3D INIT_BW;
 
 // !@EXTRINSIC_PARAMETERS
-extern V3D INIT_TBL;
-extern Q4D INIT_RBL;
+extern V3D INIT_TI2L;
+extern Q4D INIT_RI2L;
 
 void readParameters(ros::NodeHandle& n);
 

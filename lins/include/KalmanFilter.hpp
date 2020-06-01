@@ -48,12 +48,12 @@ namespace filter
 
     GlobalState() { setIdentity(); }
 
-    GlobalState(const V3D &pn, const V3D &vn, const Q4D &qbn, const V3D &ba, const V3D &bw)
+    GlobalState(const V3D &pn, const V3D &vn, const Q4D &qn, const V3D &ba, const V3D &bw)
     {
       setIdentity();
       pn_ = pn;
       vn_ = vn;
-      qn_ = qbn;
+      qn_ = qn;
       ba_ = ba;
       bw_ = bw;
     }
@@ -118,6 +118,9 @@ namespace filter
     V3D ba_; // acceleartion bias
     V3D bw_; // gyroscope bias
     V3D gn_; // gravity
+
+    V3D pl_; // lidar postion
+    Q4D ql_; // lidar orientation
   };
 
   class StatePredictor
@@ -205,21 +208,21 @@ namespace filter
       covariance_ = covariance;
     }
 
-    void initialization(double time, const V3D &pn, const V3D &vn, const Q4D &qbn,
+    void initialization(double time, const V3D &pn, const V3D &vn, const Q4D &qn,
                         const V3D &ba, const V3D &bw)
     {
-      state_ = GlobalState(pn, vn, qbn, ba, bw);
+      state_ = GlobalState(pn, vn, qn, ba, bw);
       time_ = time;
       flag_init_state_ = true;
 
       initializeCovariance();
     }
 
-    void initialization(double time, const V3D &pn, const V3D &vn, const Q4D &qbn,
+    void initialization(double time, const V3D &pn, const V3D &vn, const Q4D &qn,
                         const V3D &ba, const V3D &bw, const V3D &acc,
                         const V3D &gyr)
     {
-      state_ = GlobalState(pn, vn, qbn, ba, bw);
+      state_ = GlobalState(pn, vn, qn, ba, bw);
       time_ = time;
       acc_last = acc;
       gyr_last = gyr;
@@ -366,7 +369,7 @@ namespace filter
         state_.vn_ = state_.qn_.inverse() * state_.vn_;
         state_.qn_.setIdentity();
         state_.gn_ = state_.qn_.inverse() * state_.gn_;
-        state_.gn_ = state_.gn_ * 9.81 / state_.gn_.norm();
+        state_.gn_ = state_.gn_ * G0 / state_.gn_.norm();
         // initializeCovariance(1);
       }
     }

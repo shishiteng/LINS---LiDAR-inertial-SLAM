@@ -69,8 +69,8 @@ V3D INIT_BA;
 V3D INIT_BW;
 
 // !@EXTRINSIC_PARAMETERS
-V3D INIT_TBL;
-Q4D INIT_RBL;
+V3D INIT_TI2L;
+Q4D INIT_RI2L;
 
 template <typename T>
 T readParam(ros::NodeHandle &n, std::string name)
@@ -134,8 +134,8 @@ void readParameters(ros::NodeHandle &n)
 
   readV3D(&fsSettings, "init_ba", INIT_BA);
   readV3D(&fsSettings, "init_bw", INIT_BW);
-  readV3D(&fsSettings, "init_tbl", INIT_TBL);
-  readQ4D(&fsSettings, "init_rbl", INIT_RBL);
+  readV3D(&fsSettings, "init_ti2l", INIT_TI2L);
+  readQ4D(&fsSettings, "init_ri2l", INIT_RI2L);
 }
 
 void readV3D(cv::FileStorage *file, const std::__cxx11::string &name,
