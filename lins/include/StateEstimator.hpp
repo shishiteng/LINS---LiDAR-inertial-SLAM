@@ -497,6 +497,9 @@ namespace fusion
       globalState_.pl_ = globalState_.pn_ - globalState_.qn_ * INIT_RI2L.inverse() * INIT_TI2L;
       globalState_.ql_ = globalState_.qn_ * INIT_RI2L.inverse();
 
+      cout << "pl:" << globalState_.pl_.transpose() << endl;
+      cout << "ql:" << math_utils::Q2rpy(globalState_.ql_).transpose() * 57.3 << endl;
+
       // Undistort point cloud using estimated relative transform
       updatePointCloud();
 

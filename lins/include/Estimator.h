@@ -36,6 +36,7 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <nav_msgs/Path.h>
 #include <tic_toc.h>
 
 #include <StateEstimator.hpp>
@@ -124,6 +125,9 @@ private:
   ros::Publisher pubGpsOdometry;
 
   ros::Publisher pubLaserOdom;
+  ros::Publisher pubLaserPath;
+
+  tf::TransformBroadcaster tfBroadcaster;
 
   // !@PointCloudPtrs
   pcl::PointCloud<PointType>::Ptr distortedPointCloud;
@@ -134,6 +138,7 @@ private:
   nav_msgs::Odometry laserOdometry;
   nav_msgs::Odometry imuOdometry;
   nav_msgs::Odometry gpsOdometry;
+  nav_msgs::Path laserPath;
 
   // !@Buffers
   MapRingBuffer<Imu> imuBuf_;

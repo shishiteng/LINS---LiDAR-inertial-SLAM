@@ -6,9 +6,10 @@ Panels:
       Expanded:
         - /Global Options1
         - /Map Cloud1/Autocompute Value Bounds1
-        - /Odometry1
         - /Odometry1/Shape1
         - /Odometry2/Shape1
+        - /TF1
+        - /TF1/Frames1
       Splitter Ratio: 0.4606986939907074
     Tree Height: 823
   - Class: rviz/Selection
@@ -228,23 +229,29 @@ Visualization Manager:
         Shaft Length: 0
         Shaft Radius: 0
         Value: Axes
-      Topic: /aft_mapped_to_init
+      Topic: /laser_odom_to_init
       Unreliable: false
       Value: false
     - Class: rviz/TF
-      Enabled: false
+      Enabled: true
       Frame Timeout: 15
       Frames:
         All Enabled: true
+        laser_odom:
+          Value: true
+        world:
+          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        world:
+          laser_odom:
+            {}
       Update Interval: 0
-      Value: false
+      Value: true
     - Alpha: 0.5
       Cell Size: 10
       Class: rviz/Grid
@@ -270,6 +277,29 @@ Visualization Manager:
       Radius: 0.10000000149011612
       Reference Frame: <Fixed Frame>
       Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 25; 255; 0
+      Enabled: true
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: Path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic: /lins_fusion_node/laser_local_path
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
@@ -285,7 +315,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 35.5811882019043
+      Distance: 119.54060363769531
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -300,10 +330,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5697963237762451
+      Pitch: 0.404797226190567
       Target Frame: base_link
       Value: Orbit (rviz)
-      Yaw: 4.57402229309082
+      Yaw: 3.579008102416992
     Saved: ~
 Window Geometry:
   Displays:

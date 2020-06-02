@@ -13,7 +13,7 @@ edge_threshold: 0.5
 surf_threshold: 0.5
 nearest_feature_search_sq_dist: 25
 verbose: 0
-icp_freq: 1
+icp_freq: 5
 max_lidar_nums: 200000
 num_iter: 30
 lidar_scale: 1

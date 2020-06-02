@@ -17,6 +17,8 @@
 
 #include <Estimator.h>
 
+int g_frame_count = 0;
+
 namespace fusion
 {
 
@@ -52,6 +54,7 @@ namespace fusion
     pubLaserCloudSurfLast = pnh_.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surf_last", 2);
     pubOutlierCloudLast = pnh_.advertise<sensor_msgs::PointCloud2>("/outlier_cloud_last", 2);
     pubLaserOdometry = pnh_.advertise<nav_msgs::Odometry>(LIDAR_ODOMETRY_TOPIC, 5);
+    pubLaserPath = pnh_.advertise<nav_msgs::Path>("laser_local_path", 1);
 
     // Set types of the point cloud
     distortedPointCloud.reset(new pcl::PointCloud<PointType>());
@@ -149,6 +152,9 @@ namespace fusion
 
   void LinsFusion::publishTopics()
   {
+    if (g_frame_count < 10 || g_frame_count % 5 != 0)
+      return;
+
     if (pubLaserCloudCornerLast.getNumSubscribers() != 0)
     {
       publishCloudMsg(pubLaserCloudCornerLast,
@@ -217,8 +223,8 @@ namespace fusion
     imuBuf_.getLastMeas(imu);
 
     // Update the iterative-ESKF using a new PCL
-    estimator->processPCL(scan_time_, imu, distortedPointCloud, cloudInfoMsg,
-                          outlierPointCloud);
+    estimator->processPCL(scan_time_, imu, distortedPointCloud, cloudInfoMsg, outlierPointCloud);
+    g_frame_count++;
 
     // Clear all measurements before the current time stamp
     imuBuf_.clean(estimator->getTime());
@@ -283,6 +289,13 @@ namespace fusion
 
   void LinsFusion::publishOdometry(double timeStamp)
   {
+    // cout << "pub q: " << math_utils::Q2rpy(estimator->globalState_.ql_).transpose() * 57.3 << endl;
+    // cout << "pub p: " << estimator->globalState_.pl_.transpose() << endl;
+
+    // 前面几帧不稳定，跳过
+    if (g_frame_count < 10 || g_frame_count % 5 != 0)
+      return;
+
     laserOdometry.header.frame_id = "/world";
     laserOdometry.child_frame_id = "/laser_odom";
     laserOdometry.header.stamp = ros::Time().fromSec(timeStamp);
@@ -295,13 +308,20 @@ namespace fusion
     laserOdometry.pose.pose.position.z = estimator->globalState_.pl_[2];
     pubLaserOdometry.publish(laserOdometry);
 
-    tf::TransformBroadcaster tfBroadcaster;
+    // publish path
+    geometry_msgs::PoseStamped pose_stamped;
+    pose_stamped.header = laserOdometry.header;
+    pose_stamped.pose = laserOdometry.pose.pose;
+    laserPath.header = laserOdometry.header;
+    laserPath.poses.push_back(pose_stamped);
+    pubLaserPath.publish(laserPath);
+
     tf::StampedTransform laserOdometryTrans;
     laserOdometryTrans.frame_id_ = "/world";
     laserOdometryTrans.child_frame_id_ = "/laser_odom";
     laserOdometryTrans.stamp_ = ros::Time().fromSec(timeStamp);
     laserOdometryTrans.setRotation(tf::Quaternion(
-        estimator->globalState_.ql_.x(), 
+        estimator->globalState_.ql_.x(),
         estimator->globalState_.ql_.y(),
         estimator->globalState_.ql_.z(),
         estimator->globalState_.ql_.w()));
